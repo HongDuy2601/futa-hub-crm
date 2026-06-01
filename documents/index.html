@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FUTA Land — Soạn thảo Văn bản</title>
+  <link rel="icon" href="../assets/img/favicon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="#/" class="brand">
+      <img src="../assets/img/logo-futa-land.png" alt="FUTA Land" class="brand-logo">
+      <div class="brand-text">
+        <div class="brand-title">FUTA Land</div>
+        <div class="brand-sub">Soạn thảo Văn bản Nội bộ</div>
+      </div>
+    </a>
+    <nav class="topnav">
+      <a href="#/" data-nav="home">Trang chủ</a>
+      <a href="#/history" data-nav="history">Lịch sử</a>
+      <a href="#/manage" data-nav="manage">Quản lý template</a>
+    </nav>
+  </div>
+</header>
+
+<main id="view" class="view"></main>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- =========== TEMPLATES (Mustache-style markup in DOM) =========== -->
+
+<template id="tpl-home">
+  <section class="hero">
+    <h1>Hệ thống Soạn thảo Văn bản</h1>
+    <p>Chọn phòng ban để xem các mẫu văn bản đã được chuẩn hoá định dạng.</p>
+  </section>
+  <div class="dept-grid" id="dept-grid"></div>
+  <section class="quick-actions">
+    <a href="#/manage" class="qa-card">
+      <div class="qa-icon">＋</div>
+      <div>
+        <div class="qa-title">Thêm template mới</div>
+        <div class="qa-sub">Upload .docx hoặc soạn trực tiếp trong app</div>
+      </div>
+    </a>
+    <a href="#/history" class="qa-card">
+      <div class="qa-icon">🗂</div>
+      <div>
+        <div class="qa-title">Lịch sử văn bản</div>
+        <div class="qa-sub">Mở lại các bản nháp đã lưu</div>
+      </div>
+    </a>
+  </section>
+</template>
+
+<template id="tpl-dept">
+  <nav class="crumbs">
+    <a href="#/">Trang chủ</a> <span>›</span> <strong data-bind="deptName"></strong>
+  </nav>
+  <div class="dept-header">
+    <div>
+      <h2 data-bind="deptName"></h2>
+      <p data-bind="deptDesc" class="muted"></p>
+    </div>
+    <a class="btn btn-primary" data-action="add-template">+ Thêm template mới</a>
+  </div>
+  <div class="tpl-grid" data-bind="templateList"></div>
+</template>
+
+<template id="tpl-editor">
+  <nav class="crumbs">
+    <a href="#/">Trang chủ</a> <span>›</span>
+    <a data-bind="deptLink"></a> <span>›</span>
+    <strong data-bind="tplName"></strong>
+  </nav>
+  <div class="editor-layout">
+    <aside class="editor-form">
+      <h3>Điền thông tin</h3>
+      <div class="form-fields" data-bind="formFields"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary" data-action="save-draft">💾 Lưu nháp</button>
+        <button class="btn" data-action="reset">↻ Xoá hết</button>
+      </div>
+      <div class="export-bar">
+        <button class="btn btn-green" data-action="export-doc">⬇ Word (.doc)</button>
+        <button class="btn btn-green" data-action="export-pdf">⬇ PDF</button>
+        <button class="btn btn-red" data-action="print">🖨 In</button>
+      </div>
+    </aside>
+    <section class="editor-preview">
+      <div class="preview-toolbar">
+        <span class="muted">Xem trước (cập nhật theo thời gian thực)</span>
+      </div>
+      <div class="paper" id="preview"></div>
+    </section>
+  </div>
+</template>
+
+<template id="tpl-manage">
+  <nav class="crumbs">
+    <a href="#/">Trang chủ</a> <span>›</span> <strong>Quản lý template</strong>
+  </nav>
+  <div class="dept-header">
+    <h2>Thêm / Quản lý template</h2>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="upload">📄 Upload .docx</button>
+    <button class="tab" data-tab="paste">📋 Paste từ Word</button>
+    <button class="tab" data-tab="compose">✍ Soạn mới trong app</button>
+    <button class="tab" data-tab="list">📚 Template đã thêm</button>
+  </div>
+
+  <div class="tab-panel" data-panel="upload">
+    <p class="muted">Kéo thả file .docx hoặc click để chọn. App sẽ chuyển thành HTML giữ font &amp; định dạng cơ bản.</p>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="file-input" accept=".docx,.doc" hidden>
+      <div class="dz-inner">
+        <div class="dz-icon">📂</div>
+        <div>Kéo thả .docx vào đây<br><span class="muted">hoặc click để chọn file</span></div>
+      </div>
+    </div>
+    <div id="upload-editor" hidden></div>
+  </div>
+
+  <div class="tab-panel" data-panel="paste" hidden>
+    <p class="muted">Mở file Word của bạn, bấm <kbd>Ctrl/Cmd</kbd>+<kbd>A</kbd> → <kbd>Ctrl/Cmd</kbd>+<kbd>C</kbd>, rồi paste vào ô bên dưới. Định dạng (font, đậm, nghiêng, bảng) sẽ được giữ.</p>
+    <div id="paste-editor"></div>
+  </div>
+
+  <div class="tab-panel" data-panel="compose" hidden>
+    <p class="muted">Soạn nội dung trực tiếp. Dùng nút <strong>+ Trường biến</strong> để chèn các ô điền dạng <code>{{ten_truong}}</code>.</p>
+    <div id="compose-editor"></div>
+  </div>
+
+  <div class="tab-panel" data-panel="list" hidden>
+    <p class="muted">Các template do bạn tự thêm. Có thể xoá hoặc sửa lại.</p>
+    <div class="tpl-grid" id="user-tpl-list"></div>
+  </div>
+</template>
+
+<template id="tpl-history">
+  <nav class="crumbs">
+    <a href="#/">Trang chủ</a> <span>›</span> <strong>Lịch sử văn bản</strong>
+  </nav>
+  <div class="dept-header"><h2>Bản nháp đã lưu</h2></div>
+  <div class="history-list" id="history-list"></div>
+</template>
+
+<!-- Toolbar được dùng chung cho 3 editor -->
+<template id="tpl-rich-toolbar">
+  <div class="rt-toolbar">
+    <button data-cmd="bold" title="Đậm (Ctrl+B)"><b>B</b></button>
+    <button data-cmd="italic" title="Nghiêng (Ctrl+I)"><i>I</i></button>
+    <button data-cmd="underline" title="Gạch chân (Ctrl+U)"><u>U</u></button>
+    <span class="rt-sep"></span>
+    <select data-cmd="fontName" title="Font">
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Arial">Arial</option>
+      <option value="Calibri">Calibri</option>
+      <option value="Roboto">Roboto</option>
+      <option value="Tahoma">Tahoma</option>
+    </select>
+    <select data-cmd="fontSize" title="Cỡ chữ">
+      <option value="2">10</option>
+      <option value="3" selected>12</option>
+      <option value="4">14</option>
+      <option value="5">16</option>
+      <option value="6">20</option>
+      <option value="7">24</option>
+    </select>
+    <span class="rt-sep"></span>
+    <button data-cmd="justifyLeft" title="Trái">⬅</button>
+    <button data-cmd="justifyCenter" title="Giữa">↔</button>
+    <button data-cmd="justifyRight" title="Phải">➡</button>
+    <button data-cmd="justifyFull" title="Đều">≣</button>
+    <span class="rt-sep"></span>
+    <button data-cmd="insertUnorderedList" title="Bullet">•</button>
+    <button data-cmd="insertOrderedList" title="Số thứ tự">1.</button>
+    <span class="rt-sep"></span>
+    <button data-cmd="insertField" class="rt-field" title="Chèn trường biến">+ Trường biến</button>
+    <button data-cmd="reformat" class="rt-reformat" title="Chuẩn hoá định dạng văn bản hành chính">⚙ Chuẩn hoá format</button>
+    <span class="rt-sep"></span>
+    <button data-cmd="save-as-template" class="rt-save">💾 Lưu thành template</button>
+  </div>
+</template>
+
+<script src="js/data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/exporter.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

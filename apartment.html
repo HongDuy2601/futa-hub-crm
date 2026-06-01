@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sa bàn chung cư - FUTA Land</title>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/lib/pannellum.css">
+</head>
+<body>
+
+<div id="headerSlot"></div>
+
+<div class="container">
+  <div id="filterSlot"></div>
+
+  <div class="apartment-layout">
+    <!-- LEFT: Building diagram with floor selector -->
+    <aside class="building-side">
+      <h3>Chọn tầng</h3>
+      <svg class="building-svg" id="buildingSvg" viewBox="0 0 120 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- Sky -->
+        <defs>
+          <linearGradient id="bldgGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1a1a2e"/>
+            <stop offset="100%" stop-color="#2d2d4d"/>
+          </linearGradient>
+        </defs>
+        <!-- Ground -->
+        <rect x="0" y="265" width="120" height="15" fill="#86efac"/>
+        <!-- Building rendered by JS -->
+        <g id="buildingFloors"></g>
+        <!-- Roof -->
+        <polygon id="roof" points="10,20 60,5 110,20" fill="#7f1d1d"/>
+      </svg>
+      <div id="floorStats" style="margin-top: 1rem; font-size: .85rem; color: var(--gray-500); text-align:center;"></div>
+    </aside>
+
+    <!-- RIGHT: Floor plan with units -->
+    <section class="floor-side">
+      <div class="floor-header">
+        <h2 id="floorTitle">Tầng 1</h2>
+        <div class="stats" id="floorStatsBar"></div>
+      </div>
+      <div class="units-grid" id="unitsGrid"></div>
+    </section>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="unitModal">
+  <div class="modal"></div>
+</div>
+
+<!-- Compare drawer -->
+<div class="compare-drawer" id="compareDrawer"></div>
+
+<script src="assets/lib/pannellum.js"></script>
+<script src="assets/lib/three.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/covers.js"></script>
+<script src="assets/js/virtual.js"></script>
+<script src="assets/js/shared.js"></script>
+<script src="assets/js/apartment.js"></script>
+
+</body>
+</html>

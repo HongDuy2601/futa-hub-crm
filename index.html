@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FUTA Land - Sa Bàn Số</title>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <a href="index.html" class="logo">
+      <img src="assets/img/logo-futa-land.png" alt="FUTA Land" class="logo-img">
+      <div class="logo-divider"></div>
+      <div class="logo-text">
+        <strong>Sa Bàn Số</strong>
+        <span class="logo-sub">Digital Showroom · v0.3</span>
+      </div>
+    </a>
+    <nav class="nav">
+      <a href="index.html" class="active">Trang chủ</a>
+      <a href="apartment.html">Chung cư</a>
+      <a href="villa.html">Biệt thự</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <span class="hero-badge">🏆 Chất lượng là danh dự</span>
+  <h1>Khám phá dự án của FUTA Land</h1>
+  <p>Trải nghiệm sa bàn số tương tác - khám phá từng căn hộ, biệt thự với tour 360° và mô hình 3D ngay tại showroom.</p>
+  <div class="hero-motto">FUTA Land · Phương Trang Group</div>
+</section>
+
+<div class="container">
+  <div class="project-grid" id="projectGrid">
+    <!-- Cards rendered by JS -->
+  </div>
+
+  <div style="margin-top: 4rem; text-align: center; color: var(--gray-500); font-size: .9rem; padding: 2rem;">
+    <p><strong>Hướng dẫn:</strong> Click vào dự án để khám phá sa bàn chi tiết. App hoạt động offline 100%.</p>
+    <p style="margin-top: .5rem;">© 2026 FUTA Land · Sa Bàn Số v0.3</p>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/covers.js"></script>
+<script>
+  const grid = document.getElementById('projectGrid');
+
+  PROJECTS.forEach(p => {
+    const cover = p.type === 'apartment' ? coverApartmentSVG(p) : coverVillaSVG(p);
+    const typeLabel = p.type === 'apartment' ? '🏢 Chung cư cao cấp' : '🏡 Biệt thự ven sông';
+    const typeClass = p.type === 'villa' ? 'villa' : '';
+    const link = p.type === 'apartment' ? `apartment.html?project=${p.id}` : `villa.html?project=${p.id}`;
+
+    // Count units
+    let totalUnits = 0, available = 0;
+    if (p.type === 'apartment') {
+      p.floors.forEach(f => {
+        totalUnits += f.units.length;
+        available += f.units.filter(u => u.status === 'available').length;
+      });
+    } else {
+      totalUnits = p.villas.length;
+      available = p.villas.filter(v => v.status === 'available').length;
+    }
+
+    const card = document.createElement('a');
+    card.href = link;
+    card.className = 'project-card';
+    card.innerHTML = `
+      <div class="project-cover">
+        ${cover}
+        <span class="project-type-badge ${typeClass}">${typeLabel}</span>
+        <span class="project-developer-badge">FUTA LAND</span>
+      </div>
+      <div class="project-body">
+        <h3>${p.name}</h3>
+        <div class="tagline">"${p.tagline}"</div>
+        <div class="meta">
+          <span>📍 ${p.address}</span>
+        </div>
+        <div class="meta">
+          <span>🏠 ${totalUnits} căn</span>
+          <span>🟢 Còn: <strong>${available}</strong></span>
+          <span>📅 Bàn giao ${p.handover}</span>
+        </div>
+        <p class="description">${p.description}</p>
+        <button class="btn btn-primary btn-block">Khám phá sa bàn →</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+</script>
+
+</body>
+</html>

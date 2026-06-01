@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sa bàn biệt thự - FUTA Land</title>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/lib/pannellum.css">
+</head>
+<body>
+
+<div id="headerSlot"></div>
+
+<div class="container">
+  <div id="filterSlot"></div>
+
+  <div class="villa-map-wrap">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+      <div>
+        <h2 id="villaTitle" style="font-size: 1.5rem;">Sa bàn tổng thể</h2>
+        <p style="color: var(--gray-500); font-size: .9rem;">Click vào căn để xem chi tiết</p>
+      </div>
+      <div class="stats" id="villaStatsBar" style="display:flex; gap:1.5rem; font-size:.9rem; color: var(--gray-500);"></div>
+    </div>
+
+    <svg class="villa-svg" id="villaMap" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="aspect-ratio: 1.6/1;">
+      <!-- Background sẽ render bằng JS -->
+    </svg>
+
+    <div style="margin-top: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 8px; font-size: .9rem; color: var(--gray-700);">
+      💡 <strong>Mẹo:</strong> Click vào căn biệt thự trên sa bàn để xem chi tiết. Dùng bộ lọc phía trên để tìm căn phù hợp - những căn không match sẽ bị mờ đi.
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="unitModal">
+  <div class="modal"></div>
+</div>
+
+<!-- Compare drawer -->
+<div class="compare-drawer" id="compareDrawer"></div>
+
+<script src="assets/lib/pannellum.js"></script>
+<script src="assets/lib/three.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/covers.js"></script>
+<script src="assets/js/virtual.js"></script>
+<script src="assets/js/shared.js"></script>
+<script src="assets/js/villa.js"></script>
+
+</body>
+</html>

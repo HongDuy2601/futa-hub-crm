@@ -1,0 +1,26 @@
+{
+  "name": "FUTA Hub CRM",
+  "short_name": "FUTA CRM",
+  "description": "CRM Sale nội bộ FUTA Land — quản lý khách hàng, pipeline, quỹ căn",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0F3D14",
+  "theme_color": "#1B5E20",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "../assets/img/logo-futa-square.png",
+      "sizes": "240x240",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/img/logo-futa-square.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
