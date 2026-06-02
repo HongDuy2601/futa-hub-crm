@@ -61,6 +61,26 @@ const AI = (function () {
     score += sourceScore;
     if (lead.source === 'referral') reasons.push('Đến từ giới thiệu (tỉ lệ chốt cao)');
 
+    // (g) Bonus KH doanh nghiệp (max 12)
+    if (lead.customerType === 'business' && lead.business) {
+      const b = lead.business;
+      let bizBonus = 0;
+      if (b.size === 'large')  { bizBonus += 6; reasons.push('🏢 Doanh nghiệp lớn (200+ NV)'); }
+      else if (b.size === 'medium') { bizBonus += 4; reasons.push('🏢 Doanh nghiệp vừa'); }
+      else if (b.size === 'small') bizBonus += 2;
+      if (b.capital >= 100000) { bizBonus += 4; reasons.push('💰 Vốn điều lệ ≥ 100 tỷ'); }
+      else if (b.capital >= 30000) bizBonus += 2;
+      if (['real_estate', 'finance', 'construction'].includes(b.industry)) {
+        bizBonus += 2;
+        reasons.push('Ngành cùng lĩnh vực — quyết định nhanh');
+      }
+      if (lead.interest && lead.interest.unitCount >= 3) {
+        bizBonus += 3;
+        reasons.push('Mua ≥ 3 căn — giá trị đơn hàng cao');
+      }
+      score += Math.min(bizBonus, 12);
+    }
+
     score = Math.round(Math.min(score, 100));
     let temp, label;
     if (lead.status === 'closed-lost') { temp = 'cold'; label = 'Đã mất'; }
@@ -227,7 +247,18 @@ const AI = (function () {
     // Tổng lead
     if (/(bao nhi[êe]u (kh[áa]ch|lead)|t[ổô]ng (kh[áa]ch|lead)|s[ốô] lư[ợơ]ng kh[áa]ch)/.test(q)) {
       const active = leads.filter(l => !['closed-won', 'closed-lost'].includes(l.status)).length;
-      return `👥 Tổng ${leads.length} khách hàng, trong đó ${active} đang hoạt động.`;
+      const biz = leads.filter(l => l.customerType === 'business').length;
+      return `👥 Tổng ${leads.length} khách hàng (cá nhân ${leads.length - biz}, doanh nghiệp ${biz}). Đang hoạt động: ${active}.`;
+    }
+
+    // KH doanh nghiệp
+    if (/(doanh nghi[ệe]p|kh[áa]ch.*dn|kh.*c[ôo]ng ty|b2b)/.test(q)) {
+      const biz = leads.filter(l => l.customerType === 'business');
+      const totalBudget = biz.reduce((s, l) => s + (l.interest && l.interest.budget || 0), 0);
+      const top = biz.sort((a, b) => (b.interest.budget || 0) - (a.interest.budget || 0)).slice(0, 5);
+      let r = `🏢 ${biz.length} khách doanh nghiệp · tổng ngân sách: ${formatVND(totalBudget)}.`;
+      if (top.length) r += '\n\nTop ngân sách:\n' + top.map((x, i) => `${i+1}. ${x.name} – ${formatVND(x.interest.budget)} (${x.interest.unitCount || 1} căn)`).join('\n');
+      return r;
     }
 
     // Help

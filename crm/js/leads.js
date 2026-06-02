@@ -3,21 +3,23 @@
  * ============================================================ */
 
 const Leads = (function () {
-  let filters = { search: '', status: '', source: '', salesId: '', temp: '' };
+  let filters = { search: '', status: '', source: '', salesId: '', temp: '', custType: '', industry: '' };
   let selected = new Set();
 
   function applyFilters(all) {
     return all.filter(l => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
-        if (!l.name.toLowerCase().includes(q) &&
-            !l.phone.includes(q) &&
-            !l.code.toLowerCase().includes(q)) return false;
+        const haystack = [l.name, l.phone, l.code, l.contactName,
+          l.business && l.business.taxCode, l.business && l.business.companyName].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
       if (filters.status && l.status !== filters.status) return false;
       if (filters.source && l.source !== filters.source) return false;
       if (filters.salesId && l.assignedTo !== filters.salesId) return false;
       if (filters.temp && AI.scoreLead(l).temp !== filters.temp) return false;
+      if (filters.custType && (l.customerType || 'individual') !== filters.custType) return false;
+      if (filters.industry && (!l.business || l.business.industry !== filters.industry)) return false;
       return true;
     });
   }
@@ -78,6 +80,15 @@ const Leads = (function () {
             <option value="warm" ${filters.temp === 'warm' ? 'selected' : ''}>Ấm</option>
             <option value="cold" ${filters.temp === 'cold' ? 'selected' : ''}>Lạnh</option>
           </select>
+          <select id="ldCustType">
+            <option value="">Mọi loại KH</option>
+            <option value="individual" ${filters.custType === 'individual' ? 'selected' : ''}>👤 Cá nhân</option>
+            <option value="business"   ${filters.custType === 'business' ? 'selected' : ''}>🏢 Doanh nghiệp</option>
+          </select>
+          <select id="ldIndustry">
+            <option value="">Mọi ngành nghề</option>
+            ${BUSINESS_INDUSTRIES.map(b => `<option value="${b.key}" ${filters.industry === b.key ? 'selected' : ''}>${b.label}</option>`).join('')}
+          </select>
           <div class="spacer"></div>
           <button class="btn btn-ghost btn-sm" onclick="Leads.saveCurrentView()">⭐ Lưu bộ lọc</button>
           <button class="btn btn-ghost btn-sm" onclick="Leads.clearFilters()">↺ Xoá lọc</button>
@@ -111,6 +122,7 @@ const Leads = (function () {
               <tr>
                 <th style="width:36px"><input type="checkbox" id="selAll"></th>
                 <th>Mã</th>
+                <th>Loại</th>
                 <th>Khách hàng</th>
                 <th>SĐT</th>
                 <th>AI Score</th>
@@ -141,6 +153,8 @@ const Leads = (function () {
     document.getElementById('ldSource').onchange = e => { filters.source = e.target.value; renderList(); };
     document.getElementById('ldSales').onchange = e => { filters.salesId = e.target.value; renderList(); };
     document.getElementById('ldTemp').onchange = e => { filters.temp = e.target.value; renderList(); };
+    document.getElementById('ldCustType').onchange = e => { filters.custType = e.target.value; renderList(); };
+    document.getElementById('ldIndustry').onchange = e => { filters.industry = e.target.value; renderList(); };
 
     const selAll = document.getElementById('selAll');
     if (selAll) {
@@ -165,21 +179,32 @@ const Leads = (function () {
     const source = LEAD_SOURCES[l.source];
     const sale = Storage.getSale(l.assignedTo);
     const checked = selected.has(l.id) ? 'checked' : '';
+    const ctype = CUSTOMER_TYPES[l.customerType || 'individual'];
+    const subInfo = l.customerType === 'business' && l.business
+      ? `<div style="font-size:.7rem;color:var(--gray-500);margin-top:2px">${l.business.industryLabel}${l.contactName ? ' · LH: ' + l.contactName : ''}</div>`
+      : '';
+    const unitsBadge = (l.interest && l.interest.unitCount > 1)
+      ? ` <span class="pill" style="background:#fef3c7;color:#92400e;font-size:.65rem;padding:1px 6px">×${l.interest.unitCount} căn</span>`
+      : '';
     return `
       <tr class="${selected.has(l.id) ? 'row-selected' : ''}">
         <td onclick="event.stopPropagation()"><input type="checkbox" class="rowChk" data-id="${l.id}" ${checked} onclick="Leads.toggleSelect('${l.id}')"></td>
         <td onclick="App.navigate('lead/${l.id}')"><strong>${l.code}</strong></td>
+        <td onclick="App.navigate('lead/${l.id}')"><span class="pill" style="background:${ctype.color}22;color:${ctype.color}">${ctype.icon} ${ctype.label}</span></td>
         <td onclick="App.navigate('lead/${l.id}')">
           <div style="display:flex;align-items:center;gap:.5rem">
-            <div class="user-avatar" style="width:32px;height:32px;font-size:.72rem;background:var(--futa-green)">${initials(l.name)}</div>
-            <strong>${l.name}</strong>
+            <div class="user-avatar" style="width:32px;height:32px;font-size:.72rem;background:${ctype.color}">${initials(l.name)}</div>
+            <div>
+              <strong>${l.name}</strong>
+              ${subInfo}
+            </div>
           </div>
         </td>
         <td onclick="App.navigate('lead/${l.id}')">${l.phone}</td>
         <td onclick="App.navigate('lead/${l.id}')">${AI.scoreBadge(l)}</td>
         <td onclick="App.navigate('lead/${l.id}')"><span class="pill pill-source-${l.source}">${source.icon} ${source.label}</span></td>
         <td onclick="App.navigate('lead/${l.id}')">${l.interest.projectName || '—'}</td>
-        <td onclick="App.navigate('lead/${l.id}')">${formatVND(l.interest.budget)}</td>
+        <td onclick="App.navigate('lead/${l.id}')"><strong>${formatVND(l.interest.budget)}</strong>${unitsBadge}</td>
         <td onclick="App.navigate('lead/${l.id}')"><span class="pill pill-${status.color}">${status.label}</span></td>
         <td onclick="App.navigate('lead/${l.id}')">${sale ? sale.code : '—'}</td>
         <td onclick="App.navigate('lead/${l.id}')" style="color:var(--gray-500);font-size:.8rem">${relativeTime(l.updatedAt)}</td>
@@ -243,7 +268,7 @@ const Leads = (function () {
   function applyView(id) {
     const v = Storage.getSavedViews().find(x => x.id === id);
     if (!v) return;
-    filters = { search: '', status: '', source: '', salesId: '', temp: '', ...v.filters };
+    filters = { search: '', status: '', source: '', salesId: '', temp: '', custType: '', industry: '', ...v.filters };
     renderList();
   }
   function deleteView(id) {
@@ -253,8 +278,19 @@ const Leads = (function () {
   }
 
   function clearFilters() {
-    filters = { search: '', status: '', source: '', salesId: '', temp: '' };
+    filters = { search: '', status: '', source: '', salesId: '', temp: '', custType: '', industry: '' };
     renderList();
+  }
+
+  function toggleCustType(t) {
+    const sec = document.getElementById('fBusinessSection');
+    if (sec) sec.hidden = (t !== 'business');
+    const lbl = document.getElementById('fNameLabel');
+    if (lbl) lbl.innerHTML = (t === 'business' ? 'Người đại diện liên hệ' : 'Họ tên') + ' <span class="req">*</span>';
+    document.querySelectorAll('.cts-opt').forEach(el => {
+      const v = el.querySelector('input').value;
+      el.classList.toggle('active', v === t);
+    });
   }
 
   function exportCSV(ids) {
@@ -305,15 +341,19 @@ const Leads = (function () {
     const activities = [...(lead.activities || [])].sort((a, b) => new Date(b.at) - new Date(a.at));
     const ext = lead.extended || {};
 
+    const isBusiness = lead.customerType === 'business';
     const tabs = [
       { key: 'overview',  label: '📋 Tổng quan' },
+      ...(isBusiness ? [{ key: 'business', label: '🏢 Doanh nghiệp' }] : []),
       { key: 'finance',   label: '💰 Tài chính' },
-      { key: 'family',    label: '👨‍👩‍👧 Gia đình' },
+      ...(!isBusiness ? [{ key: 'family',  label: '👨‍👩‍👧 Gia đình' }] : []),
       { key: 'history',   label: '⏰ Lịch sử' },
       { key: 'deals',     label: '🎯 Deal & Task' },
       { key: 'docs',      label: '📎 Tài liệu' },
       { key: 'notes',     label: '📝 Ghi chú nội bộ' }
     ];
+    // Nếu user đang ở tab không hợp lệ (DN xem family hoặc cá nhân xem business) thì revert
+    if (!tabs.find(t => t.key === currentTab)) currentTab = 'overview';
 
     const html = `
       <div class="page-header">
@@ -332,11 +372,16 @@ const Leads = (function () {
       </div>
 
       <div class="detail-head card" style="padding:1.25rem;margin-bottom:1rem">
-        <div class="detail-avatar">${initials(lead.name)}</div>
+        <div class="detail-avatar" style="background:${CUSTOMER_TYPES[lead.customerType || 'individual'].color}">${initials(lead.name)}</div>
         <div class="detail-info" style="flex:1">
           <h2>${lead.name}</h2>
-          <div class="meta">📞 ${lead.phone} · ✉️ ${lead.email}</div>
+          <div class="meta">
+            ${lead.customerType === 'business' && lead.contactName ? '👤 ' + lead.contactName + ' · ' : ''}📞 ${lead.phone} · ✉️ ${lead.email}
+          </div>
           <div style="display:flex;gap:.75rem;align-items:center;margin-top:.5rem;flex-wrap:wrap">
+            <span class="pill" style="background:${CUSTOMER_TYPES[lead.customerType || 'individual'].color}22;color:${CUSTOMER_TYPES[lead.customerType || 'individual'].color}">${CUSTOMER_TYPES[lead.customerType || 'individual'].icon} ${CUSTOMER_TYPES[lead.customerType || 'individual'].label}</span>
+            ${lead.business && lead.business.industryLabel ? '<span class="pill" style="background:#f3e8ff;color:#6b21a8">🏷 ' + lead.business.industryLabel + '</span>' : ''}
+            ${lead.business && lead.business.sizeLabel ? '<span class="pill" style="background:#dbeafe;color:#1e40af">' + lead.business.sizeLabel + '</span>' : ''}
             <span class="rating-stars">${stars(lead.rating)}</span>
             ${AI.scoreBadge(lead)}
             <span class="pill pill-source-${lead.source}">${source.icon} ${source.label}</span>
@@ -347,7 +392,7 @@ const Leads = (function () {
         <div style="text-align:right">
           <div style="font-size:.72rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">Ngân sách</div>
           <div style="font-size:1.4rem;font-weight:800;color:var(--futa-red)">${formatVND(lead.interest.budget)}</div>
-          <div style="font-size:.75rem;color:var(--gray-500)">${lead.interest.projectName || 'Chưa rõ dự án'}</div>
+          <div style="font-size:.75rem;color:var(--gray-500)">${lead.interest.projectName || 'Chưa rõ dự án'}${lead.interest && lead.interest.unitCount > 1 ? ' · ×' + lead.interest.unitCount + ' căn' : ''}</div>
         </div>
       </div>
 
@@ -367,6 +412,7 @@ const Leads = (function () {
 
   function renderTab(tab, lead, deals, tasks, activities, sale, ext) {
     if (tab === 'overview') return renderOverview(lead, sale, ext);
+    if (tab === 'business') return renderBusinessTab(lead);
     if (tab === 'finance') return renderFinance(lead, ext);
     if (tab === 'family') return renderFamily(lead, ext);
     if (tab === 'history') return renderHistory(lead, activities);
@@ -411,6 +457,51 @@ const Leads = (function () {
                   onclick="Leads.changeStatus('${lead.id}', '${k}')">${v.label}</button>
               `).join('')}
             </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBusinessTab(lead) {
+    const b = lead.business || {};
+    const indLabel = b.industryLabel || (BUSINESS_INDUSTRIES.find(i => i.key === b.industry) || {}).label || '—';
+    const sizeLabel = b.sizeLabel || (BUSINESS_SIZES.find(s => s.key === b.size) || {}).label || '—';
+    const age = b.foundedYear ? (new Date().getFullYear() - b.foundedYear) + ' năm' : '—';
+    return `
+      <div class="grid-2">
+        <div>
+          <h4 style="color:var(--futa-green-dark);margin-bottom:.75rem">🏢 Hồ sơ doanh nghiệp</h4>
+          <div class="info-grid">
+            <div class="info-item full" style="grid-column:1 / -1"><label>Tên đầy đủ</label><div style="font-weight:700">${b.companyName || lead.name}</div></div>
+            <div class="info-item"><label>Mã số thuế</label><div>${b.taxCode || '—'}</div></div>
+            <div class="info-item"><label>Năm thành lập</label><div>${b.foundedYear || '—'} ${b.foundedYear ? '· ' + age : ''}</div></div>
+            <div class="info-item"><label>Ngành nghề</label><div>${indLabel}</div></div>
+            <div class="info-item"><label>Quy mô</label><div>${sizeLabel}</div></div>
+            <div class="info-item"><label>Vốn điều lệ</label><div style="font-weight:700;color:var(--futa-green)">${b.capital ? formatVND(b.capital) : '—'}</div></div>
+            <div class="info-item"><label>Số NV ước tính</label><div>${b.employees || '—'}</div></div>
+            <div class="info-item full" style="grid-column:1 / -1"><label>Trụ sở</label><div>📍 ${b.headquarters || '—'}</div></div>
+            <div class="info-item"><label>Website</label><div>${b.website ? '<a href="https://' + b.website + '" target="_blank" rel="noopener" style="color:var(--futa-green)">' + b.website + '</a>' : '—'}</div></div>
+            <div class="info-item"><label>Hạn mức công nợ</label><div>${b.creditLimit ? formatVND(b.creditLimit) : '—'}</div></div>
+          </div>
+        </div>
+        <div>
+          <h4 style="color:var(--futa-green-dark);margin-bottom:.75rem">👤 Người đại diện liên hệ</h4>
+          <div class="info-grid">
+            <div class="info-item full" style="grid-column:1 / -1"><label>Họ tên</label><div style="font-weight:600">${lead.contactName || '—'}</div></div>
+            <div class="info-item"><label>SĐT</label><div>📞 ${lead.phone}</div></div>
+            <div class="info-item"><label>Email</label><div>${lead.email || '—'}</div></div>
+          </div>
+
+          <h4 style="color:var(--futa-green-dark);margin:1.25rem 0 .5rem">🎯 Mục đích mua BĐS</h4>
+          <div style="background:var(--gray-50);padding:.85rem 1rem;border-radius:10px;font-size:.92rem">${b.purpose || 'Chưa rõ'}</div>
+
+          <h4 style="color:var(--futa-green-dark);margin:1.25rem 0 .5rem">💡 Gợi ý sale</h4>
+          <div style="font-size:.88rem;line-height:1.6;color:var(--gray-700)">
+            ${b.size === 'large' || b.size === 'medium' ? '<div>• KH lớn — chuẩn bị HĐ B2B, phòng khách VIP đón tiếp</div>' : ''}
+            ${b.industry === 'real_estate' || b.industry === 'finance' ? '<div>• Ngành cùng lĩnh vực — biết giá, tập trung vào ROI và điều khoản pháp lý</div>' : ''}
+            ${(lead.interest && lead.interest.unitCount > 1) ? '<div>• Mua nhiều căn (' + lead.interest.unitCount + ' căn) — đề xuất chính sách CK khối lượng</div>' : ''}
+            ${b.creditLimit > 0 ? '<div>• Có hạn mức công nợ ' + formatVND(b.creditLimit) + ' — có thể chia thanh toán nhiều đợt</div>' : ''}
           </div>
         </div>
       </div>
@@ -687,12 +778,74 @@ const Leads = (function () {
     const isNew = !lead.id;
     const projects = (typeof PROJECTS !== 'undefined') ? PROJECTS : [];
     const sales = Storage.getSales();
+    const ct = lead.customerType || 'individual';
+    const b = lead.business || {};
 
     const body = `
+      <div class="cust-type-switch">
+        <label class="cts-opt ${ct === 'individual' ? 'active' : ''}">
+          <input type="radio" name="fCustType" value="individual" ${ct === 'individual' ? 'checked' : ''} onchange="Leads.toggleCustType('individual')">
+          👤 Cá nhân
+        </label>
+        <label class="cts-opt ${ct === 'business' ? 'active' : ''}">
+          <input type="radio" name="fCustType" value="business" ${ct === 'business' ? 'checked' : ''} onchange="Leads.toggleCustType('business')">
+          🏢 Doanh nghiệp
+        </label>
+      </div>
+
+      <div class="form-grid" id="fBusinessSection" ${ct === 'business' ? '' : 'hidden'}>
+        <div class="form-field full">
+          <label>Tên công ty <span class="req">*</span></label>
+          <input type="text" id="fCompanyName" value="${b.companyName || ''}" placeholder="VD: Công ty TNHH ABC">
+        </div>
+        <div class="form-field">
+          <label>Mã số thuế</label>
+          <input type="text" id="fTaxCode" value="${b.taxCode || ''}" placeholder="0123456789">
+        </div>
+        <div class="form-field">
+          <label>Ngành nghề</label>
+          <select id="fIndustry">
+            <option value="">— Chưa chọn —</option>
+            ${BUSINESS_INDUSTRIES.map(i => `<option value="${i.key}" ${b.industry === i.key ? 'selected' : ''}>${i.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Quy mô</label>
+          <select id="fBusinessSize">
+            <option value="">— Chưa chọn —</option>
+            ${BUSINESS_SIZES.map(s => `<option value="${s.key}" ${b.size === s.key ? 'selected' : ''}>${s.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Vốn điều lệ (triệu VNĐ)</label>
+          <input type="number" id="fCapital" value="${b.capital || ''}" min="0" step="1000">
+        </div>
+        <div class="form-field">
+          <label>Năm thành lập</label>
+          <input type="number" id="fFoundedYear" value="${b.foundedYear || ''}" min="1900" max="2100">
+        </div>
+        <div class="form-field full">
+          <label>Trụ sở</label>
+          <input type="text" id="fHeadquarters" value="${b.headquarters || ''}" placeholder="VD: TP.HCM, Việt Nam">
+        </div>
+        <div class="form-field full">
+          <label>Mục đích mua / sử dụng BĐS</label>
+          <input type="text" id="fPurpose" value="${b.purpose || ''}" placeholder="VD: Đầu tư cho thuê / Mua văn phòng">
+        </div>
+        <div class="form-field">
+          <label>Website</label>
+          <input type="text" id="fWebsite" value="${b.website || ''}">
+        </div>
+        <div class="form-field">
+          <label>Hạn mức công nợ (triệu)</label>
+          <input type="number" id="fCreditLimit" value="${b.creditLimit || ''}" min="0">
+        </div>
+      </div>
+
       <div class="form-grid">
         <div class="form-field full">
-          <label>Họ tên <span class="req">*</span></label>
-          <input type="text" id="fName" value="${lead.name || ''}" required>
+          <label id="fNameLabel">${ct === 'business' ? 'Người đại diện liên hệ' : 'Họ tên'} <span class="req">*</span></label>
+          <input type="text" id="fName" value="${ct === 'business' ? (lead.contactName || lead.name || '') : (lead.name || '')}" required>
         </div>
         <div class="form-field">
           <label>SĐT <span class="req">*</span></label>
@@ -735,6 +888,11 @@ const Leads = (function () {
             ${[1, 2, 3, 4, 5].map(n =>
               `<option value="${n}" ${(lead.interest && lead.interest.bedrooms) === n ? 'selected' : ''}>${n} PN</option>`).join('')}
           </select>
+        </div>
+        <div class="form-field">
+          <label>Số căn quan tâm</label>
+          <input type="number" id="fUnitCount" value="${(lead.interest && lead.interest.unitCount) || 1}" min="1" step="1">
+          <span class="hint">DN thường mua nhiều căn 1 lúc</span>
         </div>
         <div class="form-field">
           <label>Sao đánh giá</label>
@@ -789,7 +947,39 @@ const Leads = (function () {
       };
     }
 
-    lead.name = name;
+    // Loại KH
+    const custType = (document.querySelector('input[name="fCustType"]:checked') || {value: 'individual'}).value;
+    lead.customerType = custType;
+    if (custType === 'business') {
+      const companyName = (document.getElementById('fCompanyName').value || '').trim();
+      if (!companyName) { toast('Nhập tên công ty', 'error'); return; }
+      const indKey = document.getElementById('fIndustry').value;
+      const indObj = BUSINESS_INDUSTRIES.find(x => x.key === indKey);
+      const sizeKey = document.getElementById('fBusinessSize').value;
+      const sizeObj = BUSINESS_SIZES.find(x => x.key === sizeKey);
+      lead.business = {
+        companyName,
+        taxCode: document.getElementById('fTaxCode').value.trim(),
+        industry: indKey || '',
+        industryLabel: indObj ? indObj.label : '',
+        size: sizeKey || '',
+        sizeLabel: sizeObj ? sizeObj.label : '',
+        employees: sizeObj ? sizeObj.employees : 0,
+        capital: parseInt(document.getElementById('fCapital').value) || 0,
+        foundedYear: parseInt(document.getElementById('fFoundedYear').value) || null,
+        headquarters: document.getElementById('fHeadquarters').value.trim(),
+        purpose: document.getElementById('fPurpose').value.trim(),
+        website: document.getElementById('fWebsite').value.trim(),
+        creditLimit: parseInt(document.getElementById('fCreditLimit').value) || 0
+      };
+      lead.name = companyName;
+      lead.contactName = name;
+    } else {
+      lead.business = null;
+      lead.contactName = null;
+      lead.name = name;
+    }
+
     lead.phone = phone;
     lead.email = document.getElementById('fEmail').value.trim();
     lead.source = document.getElementById('fSource').value;
@@ -800,7 +990,8 @@ const Leads = (function () {
       projectId: projectId || null,
       projectName: project ? project.name : '',
       budget: parseInt(document.getElementById('fBudget').value) || 0,
-      bedrooms: parseInt(document.getElementById('fBedrooms').value)
+      bedrooms: parseInt(document.getElementById('fBedrooms').value),
+      unitCount: Math.max(parseInt(document.getElementById('fUnitCount').value) || 1, 1)
     };
 
     Storage.saveLead(lead);
@@ -853,6 +1044,7 @@ const Leads = (function () {
     openActivityModal, saveActivity,
     switchTab, saveInternalNotes,
     toggleSelect, clearSelection, bulkAssign, bulkStatus, bulkDelete, bulkExport,
-    saveCurrentView, applyView, deleteView
+    saveCurrentView, applyView, deleteView,
+    toggleCustType
   };
 })();

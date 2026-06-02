@@ -33,6 +33,35 @@ const LEAD_SOURCES = {
   event:    { label: 'Sự kiện',       icon: '🎪' }
 };
 
+/* ----------- LOẠI KHÁCH HÀNG: cá nhân / doanh nghiệp ----------- */
+const CUSTOMER_TYPES = {
+  individual: { label: 'Cá nhân',    icon: '👤', color: '#3b82f6' },
+  business:   { label: 'Doanh nghiệp', icon: '🏢', color: '#9333ea' }
+};
+
+const BUSINESS_INDUSTRIES = [
+  { key: 'real_estate', label: 'Bất động sản' },
+  { key: 'manufacturing', label: 'Sản xuất' },
+  { key: 'commerce', label: 'Thương mại - Bán lẻ' },
+  { key: 'service', label: 'Dịch vụ' },
+  { key: 'construction', label: 'Xây dựng' },
+  { key: 'finance', label: 'Tài chính - Ngân hàng' },
+  { key: 'tech', label: 'Công nghệ - IT' },
+  { key: 'education', label: 'Giáo dục' },
+  { key: 'healthcare', label: 'Y tế' },
+  { key: 'logistics', label: 'Logistics - Vận tải' },
+  { key: 'food', label: 'F&B - Thực phẩm' },
+  { key: 'tourism', label: 'Du lịch - Khách sạn' },
+  { key: 'other', label: 'Khác' }
+];
+
+const BUSINESS_SIZES = [
+  { key: 'micro',  label: 'Siêu nhỏ (<10 NV)',   employees: 5 },
+  { key: 'small',  label: 'Nhỏ (10-50 NV)',       employees: 30 },
+  { key: 'medium', label: 'Vừa (50-200 NV)',      employees: 100 },
+  { key: 'large',  label: 'Lớn (200+ NV)',        employees: 500 }
+];
+
 const ACTIVITY_TYPES = {
   call:    { icon: '📞', label: 'Gọi điện' },
   sms:     { icon: '💬', label: 'Nhắn tin' },
@@ -114,10 +143,22 @@ function generateSeedLeads(count = 42) {
       });
     }
 
+    // ~30% là KH doanh nghiệp
+    const isBusiness = seedRandom(s + 50) > 0.7;
+    const customerType = isBusiness ? 'business' : 'individual';
+    const business = isBusiness ? generateBusiness(s + 60) : null;
+    // Tên hiển thị: DN dùng tên công ty + người đại diện ở field riêng
+    const displayName = isBusiness ? business.companyName : fullName;
+    // KH DN ngân sách cao hơn (gấp 2-5 lần) vì mua nhiều căn/làm văn phòng
+    const finalBudget = isBusiness ? budget * (2 + Math.floor(seedRandom(s + 70) * 3)) : budget;
+
     const leadObj = {
       id: 'L' + (1000 + i),
       code: 'L' + String(i + 1).padStart(5, '0'),
-      name: fullName,
+      name: displayName,
+      contactName: isBusiness ? fullName : null,    // người đại diện (chỉ cho DN)
+      customerType: customerType,
+      business: business,
       phone: phone,
       email: `${ln.toLowerCase()}.${fn.toLowerCase()}${i}@gmail.com`.replace(/[đĐ]/g, 'd'),
       source: source,
@@ -127,8 +168,9 @@ function generateSeedLeads(count = 42) {
       interest: {
         projectId: project ? project.id : null,
         projectName: project ? project.name : '',
-        budget: budget,
-        bedrooms: 1 + Math.floor(seedRandom(s + 10) * 3) + 1
+        budget: finalBudget,
+        bedrooms: 1 + Math.floor(seedRandom(s + 10) * 3) + 1,
+        unitCount: isBusiness ? (2 + Math.floor(seedRandom(s + 71) * 8)) : 1  // DN có thể mua nhiều căn
       },
       extended: generateCustomerExtended({ name: fullName }, s + 200),
       activities: activities,
@@ -138,6 +180,45 @@ function generateSeedLeads(count = 42) {
     leads.push(leadObj);
   }
   return leads;
+}
+
+/* ----------- SEED: thông tin doanh nghiệp ----------- */
+function generateBusiness(seed) {
+  const companyPrefixes = ['Công ty TNHH', 'Công ty CP', 'Tập đoàn', 'Công ty TNHH MTV'];
+  const companyCores = ['Phú Mỹ', 'Đại Phát', 'Tân Hoàng Long', 'Minh Khôi', 'An Phú', 'Hoàng Gia', 'Thiên Phú', 'Vạn Phát', 'Bình An', 'Nam Long', 'Sài Gòn Land', 'Việt Nam Holdings', 'Trung Nguyên', 'Đông Dương'];
+  const companySuffixes = ['', 'Group', 'Holdings', 'Việt Nam', 'Trading', 'Invest'];
+  const purposes = ['Mua văn phòng', 'Đầu tư cho thuê', 'Mua sỉ làm nhà ở cho nhân viên', 'Mua làm tài sản công ty', 'Mua để xây dựng dự án phụ', 'Đầu tư dài hạn'];
+
+  const prefix = pickFrom(companyPrefixes, seed);
+  const core = pickFrom(companyCores, seed + 1);
+  const suffix = pickFrom(companySuffixes, seed + 2);
+  const companyName = `${prefix} ${core}${suffix ? ' ' + suffix : ''}`;
+
+  const ind = BUSINESS_INDUSTRIES[Math.floor(seedRandom(seed + 3) * BUSINESS_INDUSTRIES.length)];
+  const size = BUSINESS_SIZES[Math.floor(seedRandom(seed + 4) * BUSINESS_SIZES.length)];
+  // Mã số thuế 10 hoặc 13 số
+  const taxCode = '0' + Math.floor(seedRandom(seed + 5) * 900000000 + 100000000) +
+                  (seedRandom(seed + 6) > 0.5 ? '-' + String(Math.floor(seedRandom(seed + 7) * 999)).padStart(3, '0') : '');
+  // Vốn điều lệ (tỷ): siêu nhỏ 1-5, nhỏ 5-30, vừa 30-200, lớn 200-1000
+  const capRange = { micro: [1, 5], small: [5, 30], medium: [30, 200], large: [200, 1000] }[size.key];
+  const capital = Math.round(capRange[0] + seedRandom(seed + 8) * (capRange[1] - capRange[0])) * 1000; // triệu VND
+  const year = 2000 + Math.floor(seedRandom(seed + 9) * 25);
+
+  return {
+    companyName,
+    taxCode,
+    industry: ind.key,
+    industryLabel: ind.label,
+    size: size.key,
+    sizeLabel: size.label,
+    employees: size.employees,
+    capital,           // triệu VND
+    foundedYear: year,
+    headquarters: pickFrom(['TP.HCM', 'Hà Nội', 'Đà Nẵng', 'Bình Dương', 'Đồng Nai', 'Cần Thơ'], seed + 10) + ', Việt Nam',
+    purpose: pickFrom(purposes, seed + 11),
+    website: 'www.' + core.toLowerCase().replace(/\s+/g, '') + '.vn',
+    creditLimit: Math.round(capital * 0.1) // hạn mức công nợ ~10% vốn
+  };
 }
 
 /* ----------- SEED: DEALS ----------- */

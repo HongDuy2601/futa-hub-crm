@@ -1095,6 +1095,36 @@ table.data-table tr:last-child td { border-bottom: none; }
 .kpi-card { position: relative; }
 
 /* ============================================================
+ * CUSTOMER TYPE SWITCH (modal)
+ * ============================================================ */
+.cust-type-switch {
+  display: flex;
+  gap: .5rem;
+  background: var(--gray-100);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+.cts-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding: .55rem .75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: .9rem;
+  color: var(--gray-700);
+  transition: all .15s;
+  user-select: none;
+}
+.cts-opt input { display: none; }
+.cts-opt:hover { background: white; }
+.cts-opt.active { background: white; color: var(--futa-green-dark); box-shadow: var(--shadow-sm); }
+
+/* ============================================================
  * AI SCORE BADGE
  * ============================================================ */
 .ai-score {
