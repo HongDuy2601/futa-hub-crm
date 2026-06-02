@@ -118,6 +118,13 @@ a { color: inherit; text-decoration: none; }
   background: var(--futa-green);
   color: white;
 }
+.nav a.nav-hub {
+  background: var(--futa-green);
+  color: white;
+  margin-left: .5rem;
+  border: 1px solid var(--futa-green-dark);
+}
+.nav a.nav-hub:hover { background: var(--futa-green-dark); color: white; }
 
 /* ============================================================
  * HERO (Landing page)

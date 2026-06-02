@@ -435,6 +435,7 @@ function renderSharedHeader(activePage) {
           <a href="index.html">Trang chủ</a>
           <a href="apartment.html" class="${activePage === 'apartment' ? 'active' : ''}">Chung cư</a>
           <a href="villa.html" class="${activePage === 'villa' ? 'active' : ''}">Biệt thự</a>
+          <a href="crm/index.html" class="nav-hub">🏠 Về FUTA Hub</a>
         </nav>
       </div>
     </header>
