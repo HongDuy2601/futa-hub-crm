@@ -556,58 +556,325 @@ const AI = (function () {
    * ============================================================ */
   function extractFields(text) {
     const result = {};
-    const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    if (!text) return result;
+    // Normalize: bỏ ký tự lạ + chuẩn hoá khoảng trắng (giữ \n để phân biệt dòng)
+    let clean = text.replace(/\r/g, '').replace(/[|\\]/g, ' ').replace(/[ \t]+/g, ' ');
 
-    // CCCD/CMND: 12 hoặc 9 số
-    const idMatch = text.match(/\b(\d{12}|\d{9})\b/);
-    if (idMatch) result.cccd = idMatch[1];
+    // ============================================================
+    // 1. CCCD/CMND TRƯỚC — số dài nhất ưu tiên. Sau khi match, xoá khỏi text
+    //    để các pattern sau không "ăn" nhầm chữ số.
+    // ============================================================
+    // CCCD 12 số: thường có label "Số:" hoặc đứng đơn lẻ trên 1 dòng
+    let cccdMatch = clean.match(/\b\d{12}\b/);
+    if (cccdMatch) {
+      result.cccd = cccdMatch[0];
+      clean = clean.replace(cccdMatch[0], ' '.repeat(12));
+    } else {
+      // CMND 9 số
+      const id9 = clean.match(/\b\d{9}\b/);
+      if (id9) {
+        result.cccd = id9[0];
+        clean = clean.replace(id9[0], ' '.repeat(9));
+      }
+    }
 
-    // SĐT
-    const phoneMatch = text.match(/\b(0\d{9}|(?:\+?84)\d{9})\b/);
+    // ============================================================
+    // 2. Ngày sinh — pattern dd/mm/yyyy. Xoá khỏi text sau khi match.
+    // ============================================================
+    let dobMatch = clean.match(/(?:ng[àa]y\s*sinh|date\s*of\s*birth|sinh\s*ng[àa]y|d[oa]b)[:\s\/]*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i);
+    if (!dobMatch) {
+      // Pattern ngày bất kỳ (yyyy 19xx-20xx để tránh match số sai)
+      dobMatch = clean.match(/\b(\d{1,2}[\/\-.]\d{1,2}[\/\-.](?:19|20)\d{2})\b/);
+      if (dobMatch) dobMatch[1] = dobMatch[1]; // alias để code dưới đồng nhất
+    }
+    if (dobMatch) {
+      result.dob = (dobMatch[1] || dobMatch[0]).replace(/[.-]/g, '/');
+      // remove khỏi clean
+      const raw = dobMatch[0];
+      clean = clean.replace(raw, ' '.repeat(raw.length));
+    }
+
+    // ============================================================
+    // 3. SĐT — sau khi đã loại CCCD và ngày, các số còn lại an toàn hơn
+    // ============================================================
+    const phoneText = clean.replace(/[.\-\s]/g, '');
+    const phoneMatch = phoneText.match(/(?:^|\D)(0\d{9}|(?:\+?84)\d{9})(?:\D|$)/);
     if (phoneMatch) result.phone = phoneMatch[1].replace(/^\+?84/, '0');
 
-    // Tên: dòng sau "họ và tên" / "họ tên" / "full name"
-    const nameLabel = text.match(/(?:h[ọo]\s*(?:v[àa]\s*)?t[êe]n|full\s*name)[:\s]*([A-ZÀ-Ỹ][a-zà-ỹA-ZÀ-Ỹ\s]{2,40})/i);
-    if (nameLabel) result.name = nameLabel[1].trim().replace(/\s+/g, ' ');
+    // ============================================================
+    // 4. Tên — dừng khi gặp keyword kế tiếp
+    // ============================================================
+    const stopKeywords = '(?=ng[àa]y\\s*sinh|sinh\\s*ng[àa]y|d[oa]b|gi[ớo]i\\s*t[íi]nh|sex|s[ốô]\\s*[:/]|cccd|cmnd|qu[êe]\\s*qu[áa]n|n[ơo]i|qu[ốo]c\\s*t[ịi]ch|date|place|$|\\n)';
+    const nameByLabel = clean.match(new RegExp(
+      '(?:h[ọo]\\s*v[àa]\\s*t[êe]n|h[ọo]\\s*t[êe]n|full\\s*name)[:\\s\\/]+([\\p{L}][\\p{L}\\s]{2,50}?)\\s*' + stopKeywords,
+      'iu'
+    ));
+    if (nameByLabel) {
+      result.name = nameByLabel[1].trim().replace(/\s+/g, ' ');
+    } else {
+      // Fallback: tìm dòng toàn chữ HOA Việt
+      const upperLine = clean.split(/\n+/).map(l => l.trim())
+        .find(l => /^[\p{Lu}\s]{6,50}$/u.test(l) && l.split(/\s+/).length >= 2 && l.split(/\s+/).length <= 7);
+      if (upperLine) result.name = upperLine;
+    }
+    // Trim tên: loại bỏ các từ stop nếu lẫn vào
+    if (result.name) {
+      result.name = result.name.replace(/\s+(S[ốô]|SO|Ng[àa]y|NGAY|Gi[ớo]i|Date|Place|CCCD|CMND).*$/i, '').trim();
+    }
 
-    // Ngày sinh
-    const dobMatch = text.match(/(?:ng[àa]y\s*sinh|date\s*of\s*birth|sinh\s*ng[àa]y)[:\s]*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i);
-    if (dobMatch) result.dob = dobMatch[1];
+    // ============================================================
+    // 5. Giới tính
+    // ============================================================
+    const sexMatch = clean.match(/(?:gi[ớo]i\s*t[íi]nh|sex)[:\s\/]+(Nam|N[ữu]|Male|Female)\b/i);
+    if (sexMatch) {
+      const v = sexMatch[1].toLowerCase();
+      result.sex = (v === 'nam' || v === 'male') ? 'Nam' : 'Nữ';
+    }
 
-    // Giới tính
-    const sexMatch = text.match(/(?:gi[ớo]i\s*t[íi]nh|sex)[:\s]*(Nam|N[ữu]|Male|Female)/i);
-    if (sexMatch) result.sex = sexMatch[1];
+    // ============================================================
+    // 6. Địa chỉ
+    // ============================================================
+    const addrPatterns = [
+      /(?:n[ơo]i\s*th[ưuờ]+ng\s*tr[úu]|place\s*of\s*residence)[:\s\/]+([^\n]{5,150})/i,
+      /(?:qu[êe]\s*qu[áa]n|place\s*of\s*origin)[:\s\/]+([^\n]{5,150})/i,
+      /(?:đ[ịi]a\s*ch[ỉi]|address)[:\s\/]+([^\n]{5,150})/i
+    ];
+    for (const pat of addrPatterns) {
+      const m = clean.match(pat);
+      if (m) {
+        result.address = m[1].trim().replace(/\s+/g, ' ').slice(0, 200);
+        break;
+      }
+    }
 
-    // Địa chỉ / nơi thường trú
-    const addrMatch = text.match(/(?:n[ơo]i\s*th[ưuờ]+ng\s*tr[úu]|đ[ịi]a\s*ch[ỉi]|qu[êe]\s*qu[áa]n|place\s*of\s*residence)[:\s]*([^\n]{5,120})/i);
-    if (addrMatch) result.address = addrMatch[1].trim();
-
-    // Email
-    const emailMatch = text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    // ============================================================
+    // 7. Email
+    // ============================================================
+    const emailMatch = clean.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
     if (emailMatch) result.email = emailMatch[0];
 
     return result;
   }
 
-  // Modal trích xuất → tạo lead
+  /* ============================================================
+   * OCR — scan ảnh CCCD/CMND tự động trích xuất thông tin
+   * Dùng Tesseract.js (offline sau lần load đầu tiên ~5MB engine + 4MB Vietnamese)
+   * ============================================================ */
+  let _tesseractLoading = null;
+  let _tesseractReady = false;
+
+  function loadTesseract() {
+    if (_tesseractReady) return Promise.resolve();
+    if (_tesseractLoading) return _tesseractLoading;
+    _tesseractLoading = new Promise((resolve, reject) => {
+      const sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      sc.onload = () => { _tesseractReady = true; resolve(); };
+      sc.onerror = () => reject(new Error('Không tải được Tesseract.js — kiểm tra mạng'));
+      document.head.appendChild(sc);
+    });
+    return _tesseractLoading;
+  }
+
+  /* Modal: 2 tab — Ảnh CCCD (OCR) và Dán text */
+  let currentExtractTab = 'image';
   function openExtractModal() {
+    currentExtractTab = 'image';
     const body = `
-      <p style="color:var(--gray-500);font-size:.85rem;margin-bottom:.75rem">
-        Dán nội dung text từ CMND/CCCD/hợp đồng (có thể copy từ app OCR điện thoại, Google Lens, hoặc gõ tay).
-        AI sẽ tự nhận diện họ tên, số CCCD, SĐT, địa chỉ, ngày sinh...
-      </p>
-      <div class="form-field full">
-        <label>Dán text ở đây</label>
-        <textarea id="aiExtractInput" rows="7" placeholder="VD:&#10;CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM&#10;Họ và tên: NGUYỄN VĂN AN&#10;Số: 079201001234&#10;Ngày sinh: 15/03/1990&#10;Giới tính: Nam&#10;Nơi thường trú: 123 Lê Lợi, Q1, TP.HCM&#10;SĐT: 0908123456"></textarea>
+      <div class="lg-tabs" style="margin-bottom:1rem">
+        <button class="lg-tab active" data-tab="image" onclick="AI.switchExtractTab('image')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+          📷 Quét ảnh CCCD
+        </button>
+        <button class="lg-tab" data-tab="text" onclick="AI.switchExtractTab('text')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M14 17H4v2h10v-2zm6-8H4v2h16V9zM4 15h16v-2H4v2zM4 5v2h16V5H4z"/></svg>
+          📋 Dán text
+        </button>
       </div>
-      <button class="btn btn-secondary" onclick="AI.runExtract()">🔍 Phân tích</button>
+
+      <!-- Tab IMAGE -->
+      <div id="aiExtractImageTab">
+        <p style="color:var(--gray-500);font-size:.85rem;margin-bottom:.75rem">
+          Chụp hoặc tải ảnh CCCD/CMND mặt trước. AI sẽ tự nhận diện họ tên, số CCCD, ngày sinh, giới tính, địa chỉ.
+        </p>
+
+        <div class="ocr-dropzone" id="aiOcrDrop">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor" style="opacity:.35"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+          <strong>Kéo-thả ảnh vào đây</strong>
+          <span>hoặc</span>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-top:.5rem">
+            <label class="btn btn-secondary btn-sm">
+              📁 Chọn file
+              <input type="file" id="aiOcrFile" accept="image/*" hidden onchange="AI.handleOcrFile(this.files[0])">
+            </label>
+            <label class="btn btn-secondary btn-sm">
+              📷 Chụp ảnh (mobile)
+              <input type="file" id="aiOcrCamera" accept="image/*" capture="environment" hidden onchange="AI.handleOcrFile(this.files[0])">
+            </label>
+          </div>
+          <span style="font-size:.72rem;color:var(--gray-500);margin-top:.5rem">JPG/PNG, &lt; 5MB</span>
+        </div>
+
+        <div id="aiOcrPreview" hidden style="margin-top:1rem">
+          <div style="display:flex;gap:1rem;align-items:flex-start">
+            <img id="aiOcrImg" style="max-width:200px;max-height:140px;border-radius:8px;border:1px solid var(--gray-200)">
+            <div style="flex:1">
+              <div style="font-size:.85rem;color:var(--gray-700);margin-bottom:.5rem">
+                <strong id="aiOcrFileName">—</strong>
+                <span id="aiOcrFileSize" style="color:var(--gray-500);font-size:.78rem"></span>
+              </div>
+              <button class="btn btn-primary btn-sm" id="aiOcrBtn" onclick="AI.runOCR()">🔍 Quét OCR</button>
+              <button class="btn btn-ghost btn-sm" onclick="AI.clearOcr()">↺ Đổi ảnh</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="aiOcrProgress" hidden style="margin-top:1rem">
+          <div style="font-size:.85rem;margin-bottom:.4rem"><span id="aiOcrStatus">Đang chuẩn bị...</span> <span id="aiOcrPct" style="float:right;font-weight:700"></span></div>
+          <div style="background:var(--gray-100);height:8px;border-radius:4px;overflow:hidden">
+            <div id="aiOcrBar" style="background:linear-gradient(90deg,var(--futa-green),var(--futa-green-mid));height:100%;width:0%;transition:width .25s"></div>
+          </div>
+        </div>
+
+        <details id="aiOcrRawWrap" hidden style="margin-top:.85rem">
+          <summary style="cursor:pointer;font-size:.78rem;color:var(--gray-500)">Xem text gốc từ OCR</summary>
+          <pre id="aiOcrRaw" style="background:#f3f4f6;padding:.65rem;border-radius:8px;font-size:.75rem;max-height:140px;overflow:auto;margin-top:.5rem;white-space:pre-wrap"></pre>
+        </details>
+      </div>
+
+      <!-- Tab TEXT -->
+      <div id="aiExtractTextTab" hidden>
+        <p style="color:var(--gray-500);font-size:.85rem;margin-bottom:.75rem">
+          Dán text từ app OCR khác (Google Lens, app điện thoại...) hoặc gõ tay.
+        </p>
+        <div class="form-field full">
+          <label>Dán text ở đây</label>
+          <textarea id="aiExtractInput" rows="7" placeholder="VD:&#10;CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM&#10;Họ và tên: NGUYỄN VĂN AN&#10;Số: 079201001234&#10;Ngày sinh: 15/03/1990&#10;Giới tính: Nam&#10;Nơi thường trú: 123 Lê Lợi, Q1, TP.HCM&#10;SĐT: 0908123456"></textarea>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="AI.runExtract()">🔍 Phân tích</button>
+      </div>
+
       <div id="aiExtractResult" style="margin-top:1rem"></div>
     `;
     const footer = `
       <button class="btn btn-secondary" onclick="Modal.hide()">Đóng</button>
       <button class="btn btn-primary" id="aiExtractCreateBtn" onclick="AI.createLeadFromExtract()" disabled>+ Tạo khách hàng</button>
     `;
-    Modal.show({ title: '🤖 AI trích xuất thông tin', body, footer, size: 'lg' });
+    Modal.show({ title: '🤖 AI nhận diện CCCD / CMND', body, footer, size: 'lg' });
+
+    // Wire drag & drop
+    setTimeout(() => {
+      const dz = document.getElementById('aiOcrDrop');
+      if (!dz) return;
+      ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag-over'); }));
+      ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag-over'); }));
+      dz.addEventListener('drop', e => {
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) handleOcrFile(f);
+      });
+    }, 100);
+  }
+
+  function switchExtractTab(t) {
+    currentExtractTab = t;
+    document.querySelectorAll('#aiExtractImageTab, #aiExtractTextTab').forEach(el => {
+      el.hidden = !el.id.includes(t === 'image' ? 'ImageTab' : 'TextTab');
+    });
+    document.querySelectorAll('.lg-tabs .lg-tab').forEach(el => {
+      el.classList.toggle('active', el.dataset.tab === t);
+    });
+  }
+
+  let _ocrFile = null;
+  function handleOcrFile(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('Chỉ chấp nhận ảnh', 'error'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast('Ảnh quá lớn (>5MB)', 'error'); return; }
+    _ocrFile = file;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      document.getElementById('aiOcrImg').src = ev.target.result;
+      document.getElementById('aiOcrFileName').textContent = file.name;
+      document.getElementById('aiOcrFileSize').textContent = ' · ' + (file.size / 1024).toFixed(0) + ' KB';
+      document.getElementById('aiOcrDrop').hidden = true;
+      document.getElementById('aiOcrPreview').hidden = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearOcr() {
+    _ocrFile = null;
+    document.getElementById('aiOcrDrop').hidden = false;
+    document.getElementById('aiOcrPreview').hidden = true;
+    document.getElementById('aiOcrProgress').hidden = true;
+    document.getElementById('aiOcrRawWrap').hidden = true;
+    document.getElementById('aiExtractResult').innerHTML = '';
+    document.getElementById('aiExtractCreateBtn').disabled = true;
+    document.getElementById('aiOcrFile').value = '';
+    document.getElementById('aiOcrCamera').value = '';
+  }
+
+  async function runOCR() {
+    if (!_ocrFile) { toast('Chọn ảnh trước', 'error'); return; }
+    const btn = document.getElementById('aiOcrBtn');
+    btn.disabled = true; btn.textContent = '⏳ Đang xử lý...';
+    const prog = document.getElementById('aiOcrProgress');
+    const status = document.getElementById('aiOcrStatus');
+    const pct = document.getElementById('aiOcrPct');
+    const bar = document.getElementById('aiOcrBar');
+    prog.hidden = false;
+
+    try {
+      status.textContent = 'Đang tải engine OCR (~5MB, lần đầu)...';
+      pct.textContent = ''; bar.style.width = '10%';
+      await loadTesseract();
+      if (typeof Tesseract === 'undefined') throw new Error('Tesseract.js không load được');
+
+      status.textContent = 'Đang nhận diện chữ tiếng Việt...';
+      const worker = await Tesseract.createWorker('vie', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            const p = Math.round(m.progress * 100);
+            pct.textContent = p + '%';
+            bar.style.width = (15 + p * 0.8) + '%';
+          } else {
+            status.textContent = vietnamizeStatus(m.status);
+          }
+        }
+      });
+      const { data } = await worker.recognize(_ocrFile);
+      await worker.terminate();
+
+      bar.style.width = '100%';
+      pct.textContent = '100%';
+      status.textContent = '✅ Xong — phân tích thông tin...';
+
+      const text = data.text || '';
+      document.getElementById('aiOcrRaw').textContent = text;
+      document.getElementById('aiOcrRawWrap').hidden = false;
+
+      // Run extract trên text OCR
+      const fields = extractFields(text);
+      lastExtract = fields;
+      renderExtractResult(fields, true);
+
+      btn.disabled = false; btn.textContent = '🔍 Quét lại';
+    } catch (e) {
+      status.textContent = '❌ Lỗi: ' + e.message;
+      bar.style.background = '#dc2626';
+      btn.disabled = false; btn.textContent = '🔁 Thử lại';
+      toast('OCR lỗi: ' + e.message, 'error');
+    }
+  }
+
+  function vietnamizeStatus(s) {
+    return ({
+      'loading tesseract core': 'Đang tải lõi Tesseract...',
+      'initializing tesseract': 'Khởi tạo Tesseract...',
+      'loading language traineddata': 'Đang tải dữ liệu tiếng Việt...',
+      'initializing api': 'Khởi tạo API...',
+      'recognizing text': 'Đang nhận diện...',
+    })[s] || s;
   }
 
   let lastExtract = null;
@@ -616,18 +883,29 @@ const AI = (function () {
     if (!text.trim()) { toast('Dán text trước', 'error'); return; }
     const fields = extractFields(text);
     lastExtract = fields;
+    renderExtractResult(fields, false);
+  }
+
+  function renderExtractResult(fields, fromImage) {
     const keys = Object.keys(fields);
     const result = document.getElementById('aiExtractResult');
     if (!keys.length) {
-      result.innerHTML = '<div style="color:var(--red);font-size:.85rem">Không nhận diện được trường nào. Thử dán text rõ hơn.</div>';
+      result.innerHTML = `<div style="background:#fef2f2;color:#7f1d1d;padding:.75rem 1rem;border-radius:8px;font-size:.85rem;border-left:3px solid #dc2626">
+        ❌ Không nhận diện được trường nào.
+        ${fromImage ? '<br><span style="font-size:.78rem">Ảnh có thể bị mờ/chéo. Thử chụp lại rõ hơn, đủ ánh sáng, không bị che.</span>' : ''}
+      </div>`;
+      document.getElementById('aiExtractCreateBtn').disabled = true;
       return;
     }
     const labels = { name: 'Họ tên', cccd: 'Số CCCD', phone: 'SĐT', email: 'Email', dob: 'Ngày sinh', sex: 'Giới tính', address: 'Địa chỉ' };
     result.innerHTML = `
-      <div style="background:var(--futa-green-light);border-radius:10px;padding:1rem">
-        <strong style="color:var(--futa-green-dark)">✅ Nhận diện được ${keys.length} trường:</strong>
+      <div style="background:var(--futa-green-light);border-radius:10px;padding:1rem;border-left:3px solid var(--futa-green)">
+        <strong style="color:var(--futa-green-dark)">✅ Nhận diện được ${keys.length} trường${fromImage ? ' từ ảnh' : ''}:</strong>
         <div class="info-grid" style="margin-top:.5rem">
           ${keys.map(k => `<div class="info-item"><label>${labels[k] || k}</label><div>${fields[k]}</div></div>`).join('')}
+        </div>
+        <div style="font-size:.75rem;color:var(--gray-500);margin-top:.65rem">
+          💡 Anh có thể sửa lại trong form trước khi lưu nếu OCR sai.
         </div>
       </div>
     `;
@@ -640,12 +918,27 @@ const AI = (function () {
     setTimeout(() => {
       Leads.openCreateModal();
       setTimeout(() => {
-        if (lastExtract.name) { const e = document.getElementById('fName'); if (e) e.value = lastExtract.name; }
-        if (lastExtract.phone) { const e = document.getElementById('fPhone'); if (e) e.value = lastExtract.phone; }
-        if (lastExtract.email) { const e = document.getElementById('fEmail'); if (e) e.value = lastExtract.email; }
-        toast('Đã điền thông tin từ AI, kiểm tra rồi lưu', 'success');
-      }, 100);
+        if (lastExtract.name)    { const e = document.getElementById('fName');    if (e) e.value = toTitleCase(lastExtract.name); }
+        if (lastExtract.phone)   { const e = document.getElementById('fPhone');   if (e) e.value = lastExtract.phone; }
+        if (lastExtract.email)   { const e = document.getElementById('fEmail');   if (e) e.value = lastExtract.email; }
+        // CCCD + địa chỉ → vào tab Tổng quan / extended sau khi tạo lead
+        // (lưu lại để createFromModal đọc)
+        if (lastExtract.cccd || lastExtract.address || lastExtract.dob) {
+          window._pendingExtended = {
+            cccd: lastExtract.cccd || '',
+            address: lastExtract.address || '',
+            dob: lastExtract.dob || '',
+            sex: lastExtract.sex || ''
+          };
+        }
+        toast('Đã điền ' + Object.keys(lastExtract).length + ' trường từ OCR. Kiểm tra rồi lưu.', 'success');
+      }, 150);
     }, 100);
+  }
+
+  function toTitleCase(s) {
+    if (!s) return s;
+    return s.toLowerCase().split(/\s+/).map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join(' ');
   }
 
   /* ============================================================
@@ -796,6 +1089,7 @@ const AI = (function () {
     scoreLead, scoreBadge, scoreColor,
     toggleChat, handleSend,
     extractFields, openExtractModal, runExtract, createLeadFromExtract,
+    switchExtractTab, handleOcrFile, runOCR, clearOcr,
     generateInsights, renderInsightCard
   };
 })();

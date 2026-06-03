@@ -994,6 +994,12 @@ const Leads = (function () {
       unitCount: Math.max(parseInt(document.getElementById('fUnitCount').value) || 1, 1)
     };
 
+    // Nếu có pending extended data từ OCR → merge vào
+    if (isNew && window._pendingExtended) {
+      lead.extended = Object.assign({}, lead.extended || {}, window._pendingExtended);
+      window._pendingExtended = null;
+    }
+
     Storage.saveLead(lead);
     Modal.hide();
     toast(isNew ? 'Đã tạo khách hàng' : 'Đã lưu thay đổi', 'success');
