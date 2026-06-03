@@ -261,12 +261,239 @@ const AI = (function () {
       return r;
     }
 
+    /* ============================================================
+     * INTENT MỞ RỘNG (Tuần 2)
+     * ============================================================ */
+
+    // Phân tích thời gian: tuần này / tháng này / tháng trước / quý / N ngày
+    const period = parsePeriod(q);
+
+    // Top deal lớn nhất
+    if (/(deal.*l[ớo]n.*nh[ấâ]t|deal.*cao.*nh[ấâ]t|top deal|deal.*nhi[ềe]u nh[ấâ]t)/.test(q)) {
+      const list = (period ? deals.filter(d => inRange(d.createdAt, period)) : deals)
+        .sort((a, b) => b.amount - a.amount).slice(0, 5);
+      if (!list.length) return 'Không có deal nào ' + (period ? 'trong ' + period.label : '') + '.';
+      return `🎯 Top ${list.length} deal lớn nhất${period ? ' ' + period.label : ''}:\n` +
+        list.map((d, i) => `${i+1}. ${d.code} – ${d.leadName} – ${formatVND(d.amount)} (${stageLabel(d.stage)})`).join('\n');
+    }
+
+    // Hoa hồng cao nhất / nhiều nhất
+    if (/(hoa h[ồô]ng|commission)/.test(q)) {
+      const sales = Storage.getSales().map(s => {
+        const won = deals.filter(d => d.salesId === s.id && ['contract', 'completed'].includes(d.stage));
+        return { s, comm: won.reduce((a, d) => a + d.commission, 0), n: won.length };
+      }).sort((a, b) => b.comm - a.comm);
+      const top = sales.slice(0, 5);
+      return `🎁 Hoa hồng theo sale${period ? ' (' + period.label + ')' : ''}:\n` +
+        top.map((x, i) => `${i+1}. ${x.s.name} – ${formatVND(x.comm)} (${x.n} deal)`).join('\n');
+    }
+
+    // Dự án "nóng" (nhiều lead nhất / chốt nhiều nhất)
+    if (/(d[ựu] [áa]n.*n[óo]ng|d[ựu] [áa]n.*nhi[ềe]u (lead|deal|kh[áa]ch)|d[ựu] [áa]n.*t[ốô]t)/.test(q)) {
+      const projects = (typeof PROJECTS !== 'undefined') ? PROJECTS : [];
+      const stats = projects.map(p => {
+        const ls = leads.filter(l => l.interest && l.interest.projectId === p.id);
+        const ds = deals.filter(d => d.projectId === p.id);
+        const won = ds.filter(d => ['contract', 'completed'].includes(d.stage));
+        return { name: p.name, leads: ls.length, deals: ds.length, won: won.length, revenue: won.reduce((s, d) => s + d.amount, 0) };
+      }).sort((a, b) => b.revenue - a.revenue);
+      return '🏘️ Dự án theo doanh số:\n' + stats.map((p, i) =>
+        `${i+1}. ${p.name} – ${p.leads} lead, ${p.deals} deal (${p.won} chốt), ${formatVND(p.revenue)}`
+      ).join('\n');
+    }
+
+    // Conversion theo nguồn lead
+    if (/(ngu[ồô]n.*hi[ệe]u qu[ảa]|hi[ệe]u qu[ảa].*ngu[ồô]n|chuy[ểe]n đ[ổô]i.*ngu[ồô]n|ngu[ồô]n.*t[ốô]t nh[ấâ]t|ngu[ồô]n.*nh[ấâ]t)/.test(q)) {
+      const result = Object.keys(LEAD_SOURCES).map(k => {
+        const ls = leads.filter(l => l.source === k);
+        const won = ls.filter(l => l.status === 'closed-won').length;
+        return { k, label: LEAD_SOURCES[k].label, total: ls.length, won, rate: ls.length ? (won / ls.length * 100) : 0 };
+      }).filter(x => x.total > 0).sort((a, b) => b.rate - a.rate);
+      return '📥 Tỷ lệ chốt theo nguồn:\n' +
+        result.map((s, i) => `${i+1}. ${s.label} – ${s.won}/${s.total} (${s.rate.toFixed(0)}%)`).join('\n');
+    }
+
+    // So sánh kỳ này vs kỳ trước
+    if (/(so s[áa]nh|so v[ớo]i (k[ỳy]|th[áa]ng|tu[ầa]n) tr[ưuớ]+c|t[ăa]ng tr[ưuớ]+ng|growth)/.test(q)) {
+      const now = Date.now(), day = 86400000;
+      const cur = { from: now - 30 * day, to: now };
+      const prev = { from: now - 60 * day, to: now - 30 * day };
+      const fn = r => {
+        const won = deals.filter(d => inRange(d.createdAt, r) && ['contract', 'completed'].includes(d.stage));
+        return { won: won.length, rev: won.reduce((s, d) => s + d.amount, 0), leads: leads.filter(l => inRange(l.createdAt, r)).length };
+      };
+      const c = fn(cur), p = fn(prev);
+      const pct = (a, b) => b === 0 ? (a > 0 ? '+∞' : '0') : (((a - b) / b * 100).toFixed(0) + '%');
+      return `📊 So sánh 30 ngày gần nhất vs 30 ngày trước:\n` +
+        `• Lead mới: ${c.leads} (kỳ trước ${p.leads}, ${pct(c.leads, p.leads)})\n` +
+        `• Deal chốt: ${c.won} (kỳ trước ${p.won}, ${pct(c.won, p.won)})\n` +
+        `• Doanh số: ${formatVND(c.rev)} (kỳ trước ${formatVND(p.rev)}, ${pct(c.rev, p.rev)})`;
+    }
+
+    // Forecast: dự đoán doanh số 30 ngày tới dựa trên pipeline + win rate
+    if (/(d[ựu]\s*đo[áa]n|d[ựu]\s*b[áa]o|forecast|s[ắa]p t[ớo]i|th[áa]ng t[ớo]i|sẽ.*ch[ốô]t)/.test(q)) {
+      const won = deals.filter(d => ['contract', 'completed'].includes(d.stage));
+      const lost = deals.filter(d => d.stage === 'cancelled');
+      const closed = won.length + lost.length;
+      const winRate = closed > 0 ? (won.length / closed) : 0.45;
+      const active = deals.filter(d => !['contract', 'completed', 'cancelled'].includes(d.stage));
+      const stageWeight = { new: 0.1, viewed: 0.2, negotiating: 0.5, deposit: 0.85 };
+      const weighted = active.reduce((s, d) => s + d.amount * (stageWeight[d.stage] || 0.3), 0);
+      const simple = active.reduce((s, d) => s + d.amount, 0) * winRate;
+      return `🔮 Dự đoán doanh số 30-60 ngày tới:\n` +
+        `• Pipeline đang chốt: ${formatVND(active.reduce((s,d)=>s+d.amount,0))} (${active.length} deal)\n` +
+        `• Win-rate hiện tại: ${(winRate*100).toFixed(0)}%\n` +
+        `• Ước tính theo win-rate: <strong>${formatVND(Math.round(simple))}</strong>\n` +
+        `• Ước tính theo trọng số stage: <strong>${formatVND(Math.round(weighted))}</strong>\n` +
+        `(Trọng số stage = xác suất chốt thực tế tại từng giai đoạn)`;
+    }
+
+    // Sale nào: tìm theo tên trong câu hỏi
+    const salesMatch = matchSale(q);
+    if (salesMatch && /(sale|nh[âa]n vi[êe]n|c[ủu]a|hi[ệe]u qu[ảa]|deal|kh[áa]ch).*$/.test(q)) {
+      const s = salesMatch;
+      const myDeals = deals.filter(d => d.salesId === s.id);
+      const won = myDeals.filter(d => ['contract', 'completed'].includes(d.stage));
+      const myLeads = leads.filter(l => l.assignedTo === s.id);
+      return `👤 <strong>${s.name}</strong> (${s.code} · ${s.team})\n` +
+        `• Lead phụ trách: ${myLeads.length}\n` +
+        `• Deal: ${myDeals.length} (đã chốt: ${won.length})\n` +
+        `• Doanh số: ${formatVND(won.reduce((a, d) => a + d.amount, 0))}\n` +
+        `• Hoa hồng: ${formatVND(won.reduce((a, d) => a + d.commission, 0))}\n` +
+        `• Conversion: ${myDeals.length ? (won.length / myDeals.length * 100).toFixed(0) : 0}%`;
+    }
+
+    // Khách hàng cụ thể (tìm theo tên trong câu hỏi)
+    const leadMatch = matchLead(leads, q);
+    if (leadMatch) {
+      const l = leadMatch;
+      const score = scoreLead(l);
+      const sale = Storage.getSale(l.assignedTo);
+      const myDeals = deals.filter(d => d.leadId === l.id);
+      return `👥 <strong>${l.name}</strong> (${l.code})\n` +
+        `• Loại: ${CUSTOMER_TYPES[l.customerType || 'individual'].label}\n` +
+        `• SĐT: ${l.phone}\n` +
+        `• Trạng thái: ${LEAD_STATUS[l.status].label}\n` +
+        `• Nguồn: ${LEAD_SOURCES[l.source].label}\n` +
+        `• Ngân sách: ${formatVND(l.interest.budget)}${l.interest.unitCount > 1 ? ' · '+l.interest.unitCount+' căn' : ''}\n` +
+        `• AI Score: ${score.score}/100 (${score.label})\n` +
+        `• Sale: ${sale ? sale.name : '—'}\n` +
+        `• Deal: ${myDeals.length}`;
+    }
+
+    // Stage yếu nhất / cần xử lý
+    if (/(stage.*y[ếe]u|y[ếe]u nh[ấâ]t|đi[ểe]m ngh[ẽe]n|bottleneck|stuck|t[ắa]c)/.test(q)) {
+      const stageCount = {};
+      deals.filter(d => !['completed', 'cancelled'].includes(d.stage)).forEach(d => {
+        stageCount[d.stage] = (stageCount[d.stage] || 0) + 1;
+      });
+      const entries = Object.entries(stageCount).sort((a, b) => b[1] - a[1]);
+      if (!entries.length) return 'Không có deal đang mở.';
+      const worst = entries[0];
+      const stage = (typeof DEAL_STAGES !== 'undefined') ? DEAL_STAGES.find(s => s.key === worst[0]) : null;
+      return `⚠️ Stage có nhiều deal nhất (có thể là điểm nghẽn):\n` +
+        `<strong>${stage ? stage.label : worst[0]}</strong>: ${worst[1]} deal\n\n` +
+        `Tất cả: ` + entries.map(([k, v]) => {
+          const s = DEAL_STAGES.find(x => x.key === k);
+          return (s ? s.label : k) + ' (' + v + ')';
+        }).join(', ');
+    }
+
     // Help
     if (/(gi[úu]p|help|l[àa]m đư[ợơ]c g[ìi]|h[ưu][ơo]ng d[ẫa]n|b[ạa]n l[àa] ai)/.test(q)) {
-      return 'Em là trợ lý AI của FUTA Hub 🤖. Em giúp được:\n• Doanh số, hoa hồng\n• Deal sắp đến hạn\n• Khách tiềm năng (AI scoring)\n• Task hôm nay/quá hạn\n• Quỹ căn còn lại\n• Xếp hạng sale\n\nCòn nếu kết nối Ollama/Gemini ở Cài đặt → AI, em trả lời được mọi câu hỏi tự do.';
+      return '🤖 Em trả lời được những câu hỏi sau:\n' +
+        '• <strong>Doanh số / Pipeline / Hoa hồng</strong>\n' +
+        '• <strong>Deal sắp đến hạn / deal lớn nhất</strong>\n' +
+        '• <strong>Top khách tiềm năng</strong> (AI scoring)\n' +
+        '• <strong>Task hôm nay / quá hạn</strong>\n' +
+        '• <strong>Quỹ căn còn / đã bán</strong>\n' +
+        '• <strong>Xếp hạng sale / hiệu suất 1 sale</strong> (vd: "doanh số của Hồng Duy")\n' +
+        '• <strong>1 khách hàng cụ thể</strong> (gõ tên KH)\n' +
+        '• <strong>Khách doanh nghiệp</strong>\n' +
+        '• <strong>Dự án nóng nhất</strong>\n' +
+        '• <strong>Nguồn lead hiệu quả nhất</strong>\n' +
+        '• <strong>So sánh kỳ này vs kỳ trước</strong>\n' +
+        '• <strong>Dự đoán doanh số tháng tới</strong> (forecast)\n' +
+        '• <strong>Stage yếu / điểm nghẽn pipeline</strong>\n\n' +
+        'Hoặc bật LLM ở <strong>Cài đặt → AI</strong> để hỏi tự do.';
     }
 
     return null; // không match → để LLM xử lý
+  }
+
+  /* ----------- HELPER: parse khoảng thời gian từ câu hỏi ----------- */
+  function parsePeriod(q) {
+    const now = new Date();
+    const day = 86400000;
+    if (/(h[ôo]m nay|today)/.test(q)) {
+      const start = new Date(now); start.setHours(0,0,0,0);
+      return { from: start.getTime(), to: start.getTime() + day, label: 'hôm nay' };
+    }
+    if (/(h[ôo]m qua|yesterday)/.test(q)) {
+      const start = new Date(now); start.setHours(0,0,0,0); start.setDate(start.getDate() - 1);
+      return { from: start.getTime(), to: start.getTime() + day, label: 'hôm qua' };
+    }
+    if (/(tu[ầa]n n[àa]y|this week)/.test(q)) {
+      const start = new Date(now); start.setHours(0,0,0,0);
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // monday
+      return { from: start.getTime(), to: start.getTime() + 7 * day, label: 'tuần này' };
+    }
+    if (/(tu[ầa]n tr[ưuớ]+c|last week)/.test(q)) {
+      const start = new Date(now); start.setHours(0,0,0,0);
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - 7);
+      return { from: start.getTime(), to: start.getTime() + 7 * day, label: 'tuần trước' };
+    }
+    if (/(th[áa]ng n[àa]y|this month)/.test(q)) {
+      const s = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const e = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+      return { from: s, to: e, label: 'tháng này' };
+    }
+    if (/(th[áa]ng tr[ưuớ]+c|last month)/.test(q)) {
+      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+      const e = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      return { from: s, to: e, label: 'tháng trước' };
+    }
+    const m = q.match(/(\d+)\s*ng[àa]y/);
+    if (m) {
+      const n = parseInt(m[1]);
+      return { from: now.getTime() - n * day, to: now.getTime(), label: n + ' ngày gần đây' };
+    }
+    return null;
+  }
+
+  function inRange(iso, range) {
+    if (!iso || !range) return false;
+    const t = new Date(iso).getTime();
+    return t >= range.from && t < range.to;
+  }
+
+  function stageLabel(key) {
+    const s = (typeof DEAL_STAGES !== 'undefined') ? DEAL_STAGES.find(x => x.key === key) : null;
+    return s ? s.label : key;
+  }
+
+  /* ----------- HELPER: tìm sale / lead theo tên trong câu hỏi ----------- */
+  function matchSale(q) {
+    const sales = Storage.getSales();
+    return sales.find(s => {
+      const parts = s.name.toLowerCase().split(/\s+/);
+      // match nếu có 2 từ liền nhau từ tên xuất hiện trong câu hỏi
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (q.includes(parts[i] + ' ' + parts[i + 1])) return true;
+      }
+      return false;
+    });
+  }
+
+  function matchLead(leads, q) {
+    // tìm lead có tên xuất hiện trong câu hỏi (ít nhất 2 từ)
+    return leads.find(l => {
+      const parts = (l.name || '').toLowerCase().split(/\s+/);
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (parts[i].length >= 3 && q.includes(parts[i] + ' ' + parts[i + 1])) return true;
+      }
+      return false;
+    });
   }
 
   // Gọi LLM ngoài (online) — Ollama local hoặc Gemini free
@@ -421,9 +648,154 @@ const AI = (function () {
     }, 100);
   }
 
+  /* ============================================================
+   * AI INSIGHTS — tự sinh 3-6 thẻ insight cho Dashboard
+   * Mỗi insight: { type:'positive|negative|warning|info', icon, title, body, action? }
+   * ============================================================ */
+  function generateInsights() {
+    const leads = Storage.getLeads();
+    const deals = Storage.getDeals();
+    const tasks = Storage.getTasks();
+    const me = Storage.getCurrentUser();
+    const now = Date.now(), day = 86400000;
+    const out = [];
+
+    // 1. So sánh doanh số 30d vs 30d trước
+    const won = deals.filter(d => ['contract', 'completed'].includes(d.stage));
+    const cur30 = won.filter(d => new Date(d.createdAt).getTime() >= now - 30 * day);
+    const prev30 = won.filter(d => {
+      const t = new Date(d.createdAt).getTime();
+      return t >= now - 60 * day && t < now - 30 * day;
+    });
+    const curRev = cur30.reduce((s, d) => s + d.amount, 0);
+    const prevRev = prev30.reduce((s, d) => s + d.amount, 0);
+    if (prevRev > 0) {
+      const pct = ((curRev - prevRev) / prevRev * 100);
+      if (pct >= 10) out.push({
+        type: 'positive', icon: '📈', title: 'Doanh số tăng ' + pct.toFixed(0) + '%',
+        body: '30 ngày gần nhất ' + formatVND(curRev) + ' so với ' + formatVND(prevRev) + ' kỳ trước.',
+        action: { label: 'Xem báo cáo', route: 'reports' }
+      });
+      else if (pct <= -10) out.push({
+        type: 'negative', icon: '📉', title: 'Doanh số giảm ' + Math.abs(pct).toFixed(0) + '%',
+        body: 'Cần xem lại pipeline để xác định nguyên nhân.',
+        action: { label: 'Xem báo cáo', route: 'reports' }
+      });
+    } else if (curRev > 0) {
+      out.push({ type: 'positive', icon: '🎉', title: '30 ngày khởi sắc', body: 'Doanh số ' + formatVND(curRev) + ' (kỳ trước chưa có deal).' });
+    }
+
+    // 2. Sale top performer
+    const sales = Storage.getSales().map(s => {
+      const my = deals.filter(d => d.salesId === s.id);
+      const myWon = my.filter(d => ['contract', 'completed'].includes(d.stage));
+      return { s, total: my.length, won: myWon.length, conv: my.length ? myWon.length / my.length : 0, rev: myWon.reduce((a, d) => a + d.amount, 0) };
+    }).filter(x => x.total >= 2);
+    const topConv = [...sales].sort((a, b) => b.conv - a.conv)[0];
+    if (topConv && topConv.conv >= 0.5) {
+      out.push({
+        type: 'positive', icon: '🏆', title: topConv.s.name + ' dẫn đầu conversion',
+        body: 'Conversion ' + (topConv.conv * 100).toFixed(0) + '% (' + topConv.won + '/' + topConv.total + ' deal). Cân nhắc nhân rộng cách làm.',
+        action: { label: 'Bảng xếp hạng', route: 'targets' }
+      });
+    }
+
+    // 3. Stage nghẽn
+    const active = deals.filter(d => !['completed', 'cancelled'].includes(d.stage));
+    const byStage = {};
+    active.forEach(d => byStage[d.stage] = (byStage[d.stage] || 0) + 1);
+    const entries = Object.entries(byStage).sort((a, b) => b[1] - a[1]);
+    if (entries.length && entries[0][1] >= Math.max(5, active.length * 0.35)) {
+      const stage = (typeof DEAL_STAGES !== 'undefined') ? DEAL_STAGES.find(s => s.key === entries[0][0]) : null;
+      out.push({
+        type: 'warning', icon: '⚠️', title: 'Pipeline có điểm nghẽn ở "' + (stage ? stage.label : entries[0][0]) + '"',
+        body: entries[0][1] + ' deal đang dồn ở stage này. Cần kế hoạch đẩy chuyển tiếp.',
+        action: { label: 'Xem Pipeline', route: 'pipeline' }
+      });
+    }
+
+    // 4. Task quá hạn của tôi
+    const myOverdue = tasks.filter(t => !t.done && t.assignedTo === me.id && new Date(t.dueAt).getTime() < now - day / 2);
+    if (myOverdue.length >= 1) {
+      out.push({
+        type: 'negative', icon: '🚨', title: myOverdue.length + ' task của bạn đã quá hạn',
+        body: myOverdue.slice(0, 2).map(t => '• ' + t.title).join('<br>') + (myOverdue.length > 2 ? '<br>...và ' + (myOverdue.length - 2) + ' task khác' : ''),
+        action: { label: 'Xem tất cả', route: 'tasks' }
+      });
+    }
+
+    // 5. KH nóng cần xử lý ngay
+    const hotLeads = leads
+      .filter(l => !['closed-won', 'closed-lost'].includes(l.status) && l.assignedTo === me.id)
+      .map(l => ({ l, s: scoreLead(l) }))
+      .filter(x => x.s.temp === 'hot')
+      .sort((a, b) => b.s.score - a.s.score);
+    if (hotLeads.length >= 1) {
+      out.push({
+        type: 'info', icon: '🔥', title: hotLeads.length + ' khách "nóng" của bạn',
+        body: 'Top: <strong>' + hotLeads[0].l.name + '</strong> (' + hotLeads[0].s.score + '/100). Nên liên hệ trong 24h.',
+        action: { label: 'Xem KH', route: 'lead/' + hotLeads[0].l.id, isDirectLink: true }
+      });
+    }
+
+    // 6. Forecast tháng tới
+    const winRate = (won.length + deals.filter(d => d.stage === 'cancelled').length) > 0
+      ? won.length / (won.length + deals.filter(d => d.stage === 'cancelled').length)
+      : 0.45;
+    const pipeline = active.reduce((s, d) => s + d.amount, 0);
+    const forecast = pipeline * winRate;
+    if (forecast > 0) {
+      out.push({
+        type: 'info', icon: '🔮', title: 'Dự đoán 30-60 ngày tới',
+        body: 'Ước tính chốt ' + formatVND(Math.round(forecast)) + ' (pipeline ' + formatVND(pipeline) + ' × win-rate ' + (winRate * 100).toFixed(0) + '%).'
+      });
+    }
+
+    // 7. KH lâu chưa tương tác
+    const stale = leads.filter(l => {
+      if (['closed-won', 'closed-lost'].includes(l.status)) return false;
+      if (l.assignedTo !== me.id) return false;
+      const acts = l.activities || [];
+      if (!acts.length) return true;
+      const last = Math.max(...acts.map(a => new Date(a.at).getTime()));
+      return (now - last) > 14 * day;
+    });
+    if (stale.length >= 3) {
+      out.push({
+        type: 'warning', icon: '⏰', title: stale.length + ' khách lâu chưa tương tác',
+        body: 'Có ' + stale.length + ' KH > 14 ngày chưa có activity. Cần follow up.',
+        action: { label: 'Xem danh sách', route: 'leads' }
+      });
+    }
+
+    return out.slice(0, 6); // max 6 insight
+  }
+
+  function renderInsightCard(ins) {
+    const colors = {
+      positive: { bg: '#dcfce7', border: '#16a34a', text: '#14532d' },
+      negative: { bg: '#fee2e2', border: '#dc2626', text: '#7f1d1d' },
+      warning:  { bg: '#fef3c7', border: '#f59e0b', text: '#78350f' },
+      info:     { bg: '#dbeafe', border: '#2563eb', text: '#1e3a8a' }
+    };
+    const c = colors[ins.type] || colors.info;
+    const route = ins.action && ins.action.route;
+    return `
+      <div class="ai-insight-card" style="background:${c.bg};border-left:4px solid ${c.border};color:${c.text}">
+        <div class="ai-insight-head">
+          <span class="ai-insight-icon">${ins.icon}</span>
+          <strong>${ins.title}</strong>
+        </div>
+        <div class="ai-insight-body">${ins.body}</div>
+        ${ins.action ? `<button class="ai-insight-btn" onclick="App.navigate('${route}')" style="color:${c.border}">${ins.action.label} →</button>` : ''}
+      </div>
+    `;
+  }
+
   return {
     scoreLead, scoreBadge, scoreColor,
     toggleChat, handleSend,
-    extractFields, openExtractModal, runExtract, createLeadFromExtract
+    extractFields, openExtractModal, runExtract, createLeadFromExtract,
+    generateInsights, renderInsightCard
   };
 })();

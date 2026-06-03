@@ -1,0 +1,72 @@
+{
+  "name": "futa-email-marketing",
+  "version": "1.0.0",
+  "description": "FUTA Land — Email Marketing bulk sender (native desktop app)",
+  "main": "main.js",
+  "author": "FUTA Land",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder -mwl"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "vn.futaland.email",
+    "productName": "FUTA Email",
+    "copyright": "© 2026 FUTA Land · Phương Trang Group",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build-assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "apps-script.gs",
+      "!dist/**/*",
+      "!node_modules/**/*",
+      "!build-assets/**/*"
+    ],
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "icon": "build-assets/icon.icns",
+      "category": "public.app-category.business",
+      "darkModeSupport": false
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build-assets/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build-assets/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "FUTA Email"
+    },
+    "dmg": {
+      "title": "FUTA Email ${version}",
+      "window": { "width": 540, "height": 380 }
+    }
+  }
+}

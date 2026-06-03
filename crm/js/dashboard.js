@@ -142,6 +142,25 @@ const Dashboard = (function () {
     }).slice(0, 5);
   }
 
+  function renderInsightsSection() {
+    if (typeof AI === 'undefined' || !AI.generateInsights) return '';
+    const insights = AI.generateInsights();
+    if (!insights || !insights.length) return '';
+    return `
+      <div class="card" style="margin-bottom:1.25rem;background:linear-gradient(135deg,#f0f9ff,#f5f3ff)">
+        <div class="card-header" style="background:transparent;border-bottom:1px solid rgba(0,0,0,.06)">
+          <h3>🤖 AI Insight — gợi ý từ dữ liệu</h3>
+          <span style="color:var(--gray-500);font-size:.8rem">Tự động cập nhật</span>
+        </div>
+        <div class="card-body">
+          <div class="ai-insight-grid">
+            ${insights.map(i => AI.renderInsightCard(i)).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function myTargetCard() {
     const target = Storage.getMyTarget();
     if (!target) return '';
@@ -230,6 +249,8 @@ const Dashboard = (function () {
           <div class="kpi-meta">Trên tổng deal đã kết thúc</div>
         </div>
       </div>
+
+      ${renderInsightsSection()}
 
       ${myTargetCard()}
 

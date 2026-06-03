@@ -13,6 +13,7 @@ const App = (function () {
     'tasks':         () => Tasks.render(),
     'targets':       () => Targets.render(),
     'reports':       () => Reports.render(),
+    'executive':     () => Executive.render(),
     'notifications': () => Notifications.render(),
     'settings':      () => Settings.render()
   };

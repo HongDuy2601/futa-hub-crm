@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FUTA Live Translator — POC</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a href="../crm/index.html" class="back-link">← Về FUTA Hub</a>
+    <h1>FUTA Live Translator <span class="badge">POC</span></h1>
+    <div class="status" id="callStatus">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Chưa bắt đầu cuộc gọi</span>
+      <span class="timer" id="callTimer">00:00</span>
+    </div>
+  </header>
+
+  <main class="stage">
+    <!-- LEFT: Sale FUTA (Vietnamese) -->
+    <section class="party left" id="partyA">
+      <div class="avatar">
+        <div class="circle">SA</div>
+        <div class="ring" id="ringA"></div>
+      </div>
+      <div class="meta">
+        <h2>Sale FUTA</h2>
+        <div class="lang-row">
+          <label>Ngôn ngữ:</label>
+          <select id="langA" disabled>
+            <option value="vi-VN">Tiếng Việt</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="mic-btn" id="micA" disabled>
+        <svg viewBox="0 0 24 24" width="32" height="32"><path fill="currentColor" d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+        <span>Giữ để nói</span>
+      </button>
+
+      <div class="transcript-block">
+        <div class="t-label">Anh nói (gốc)</div>
+        <div class="t-content" id="origA">—</div>
+        <div class="t-label translated">Khách nghe (đã dịch)</div>
+        <div class="t-content translated" id="transA">—</div>
+      </div>
+    </section>
+
+    <!-- CENTER: Translation Bridge -->
+    <section class="bridge">
+      <div class="bridge-anim">
+        <div class="wave w1"></div>
+        <div class="wave w2"></div>
+        <div class="wave w3"></div>
+        <div class="bot-icon">
+          <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M12 2a2 2 0 012 2v2h3a3 3 0 013 3v9a3 3 0 01-3 3H7a3 3 0 01-3-3V9a3 3 0 013-3h3V4a2 2 0 012-2zm-3.5 8a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm7 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM9 16h6v1.5H9V16z"/></svg>
+        </div>
+      </div>
+      <h3>Translation Bridge</h3>
+      <div class="latency-box">
+        <div class="lat-row"><span>STT</span><b id="lat-stt">— ms</b></div>
+        <div class="lat-row"><span>Translate</span><b id="lat-tr">— ms</b></div>
+        <div class="lat-row"><span>TTS</span><b id="lat-tts">— ms</b></div>
+        <div class="lat-row total"><span>Total</span><b id="lat-total">— ms</b></div>
+      </div>
+      <div class="controls">
+        <button id="startCall" class="btn primary">📞 Bắt đầu cuộc gọi</button>
+        <button id="endCall" class="btn danger" disabled>📵 Kết thúc</button>
+      </div>
+      <div class="hint">
+        Mỗi bên giữ nút mic → nói → thả → đối phương sẽ nghe bản dịch.
+        Mô phỏng 2 leg của cuộc gọi qua bot dịch.
+      </div>
+    </section>
+
+    <!-- RIGHT: Customer (Foreign) -->
+    <section class="party right" id="partyB">
+      <div class="avatar">
+        <div class="circle alt">KH</div>
+        <div class="ring" id="ringB"></div>
+      </div>
+      <div class="meta">
+        <h2>Khách hàng</h2>
+        <div class="lang-row">
+          <label>Ngôn ngữ:</label>
+          <select id="langB">
+            <option value="en-US">English (US)</option>
+            <option value="ko-KR">한국어 (Korean)</option>
+            <option value="zh-CN">中文 (Chinese)</option>
+            <option value="ja-JP">日本語 (Japanese)</option>
+            <option value="fr-FR">Français</option>
+            <option value="ru-RU">Русский</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="mic-btn alt" id="micB" disabled>
+        <svg viewBox="0 0 24 24" width="32" height="32"><path fill="currentColor" d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+        <span>Press to talk</span>
+      </button>
+
+      <div class="transcript-block">
+        <div class="t-label">Khách nói (gốc)</div>
+        <div class="t-content" id="origB">—</div>
+        <div class="t-label translated">Sale nghe (đã dịch)</div>
+        <div class="t-content translated" id="transB">—</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Call log -->
+  <aside class="log-panel">
+    <div class="log-header">
+      <h3>Pipeline Log</h3>
+      <button id="clearLog" class="btn-small">Xóa</button>
+    </div>
+    <div id="log" class="log-body"></div>
+  </aside>
+
+  <footer class="footer">
+    <span>Stack: Web Speech API (browser) · MyMemory Translation (free) · Zero backend</span>
+    <span>Khi đưa lên SIP/PSTN: chỉ swap nguồn audio, pipeline giữ nguyên.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

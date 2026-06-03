@@ -8,3 +8,9 @@
 
 # Backups
 *-backup-*.json
+
+# Electron / Node
+node_modules/
+**/node_modules/
+email/dist/
+email/out/

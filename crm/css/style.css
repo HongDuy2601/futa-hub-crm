@@ -1095,6 +1095,74 @@ table.data-table tr:last-child td { border-bottom: none; }
 .kpi-card { position: relative; }
 
 /* ============================================================
+ * HEATMAP (executive BI)
+ * ============================================================ */
+.heatmap-wrap { overflow-x: auto; }
+table.heatmap {
+  border-collapse: separate;
+  border-spacing: 2px;
+  margin: 0 auto;
+}
+table.heatmap th {
+  font-size: .7rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  padding: 2px 4px;
+  text-align: center;
+  min-width: 22px;
+}
+table.heatmap th:first-child { min-width: 30px; text-align: right; padding-right: .5rem; }
+table.heatmap td {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--gray-100);
+  transition: transform .1s;
+  cursor: pointer;
+}
+table.heatmap td:hover { transform: scale(1.5); z-index: 2; box-shadow: var(--shadow); }
+
+/* ============================================================
+ * AI INSIGHT CARDS (dashboard)
+ * ============================================================ */
+.ai-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: .75rem;
+}
+.ai-insight-card {
+  padding: .85rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: .85rem;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.ai-insight-head {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .92rem;
+}
+.ai-insight-icon { font-size: 1.15rem; }
+.ai-insight-body { font-size: .82rem; opacity: .85; }
+.ai-insight-btn {
+  align-self: flex-start;
+  background: white;
+  border: 1px solid currentColor;
+  padding: .25rem .65rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 700;
+  margin-top: .35rem;
+  cursor: pointer;
+  transition: all .12s;
+}
+.ai-insight-btn:hover { background: currentColor; color: white !important; }
+.ai-insight-btn:hover * { color: white !important; }
+
+/* ============================================================
  * CUSTOMER TYPE SWITCH (modal)
  * ============================================================ */
 .cust-type-switch {
