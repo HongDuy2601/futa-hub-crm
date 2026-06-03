@@ -3,7 +3,7 @@
  * Cache app shell để chạy offline hoàn toàn (cài như app)
  * ============================================================ */
 
-const CACHE_NAME = 'futa-crm-v2.1';
+const CACHE_NAME = 'futa-crm-v2.3';
 const ASSETS = [
   './',
   './index.html',
@@ -61,17 +61,20 @@ self.addEventListener('fetch', (e) => {
     return; // để browser xử lý bình thường
   }
 
-  // App shell: cache-first, fallback network, rồi cập nhật cache
+  // NETWORK-FIRST cho HTML/JS/CSS — luôn lấy bản mới nhất khi online;
+  // fallback cache khi offline. Cho phép app tự cập nhật mà không bị kẹt cache cũ.
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetchPromise = fetch(e.request).then(resp => {
-        if (resp && resp.status === 200 && e.request.method === 'GET') {
-          const clone = resp.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return resp;
-      }).catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(e.request).then(resp => {
+      if (resp && resp.status === 200 && e.request.method === 'GET') {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return resp;
+    }).catch(() => caches.match(e.request))
   );
+});
+
+// Hỗ trợ client gửi SKIP_WAITING khi có bản mới
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });

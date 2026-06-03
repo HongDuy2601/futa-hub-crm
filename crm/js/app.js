@@ -219,9 +219,30 @@ const App = (function () {
   /* ----------- PWA ----------- */
   let deferredPrompt = null;
   function setupPWA() {
-    // Register service worker
+    // Register service worker + tự reload khi có bản mới
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(err => console.warn('SW register fail', err));
+      navigator.serviceWorker.register('service-worker.js').then(reg => {
+        if (!reg) return;
+        // Kiểm tra update mỗi lần load
+        reg.update().catch(() => {});
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              // Có bản mới — yêu cầu skipWaiting + reload
+              nw.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+        // Khi SW mới active → reload 1 lần để dùng asset mới
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (reloaded) return;
+          reloaded = true;
+          location.reload();
+        });
+      }).catch(err => console.warn('SW register fail', err));
     }
     // Install prompt
     window.addEventListener('beforeinstallprompt', (e) => {

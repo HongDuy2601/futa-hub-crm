@@ -1,6 +1,6 @@
 /* ============================================================
- * FUTA HUB CRM - LOGIN SCREEN (v2)
- * Redesign: glass card + animated mesh bg + SVG skyline + stats
+ * FUTA HUB CRM - LOGIN SCREEN (v3 — centered card on hero background)
+ * Card đăng nhập đứng giữa, background là hero dự án FUTA Land
  * ============================================================ */
 
 const Login = (function () {
@@ -44,7 +44,6 @@ const Login = (function () {
     const sales = (Storage._raw && Storage._raw.getSales) ? Storage._raw.getSales() : Storage.getSales();
     const orgs = (typeof Storage.getOrgs === 'function') ? Storage.getOrgs() : [];
 
-    // Group cho dropdown demo
     const groups = {};
     sales.forEach(s => {
       const oid = s.orgId || 'other';
@@ -52,47 +51,42 @@ const Login = (function () {
       groups[oid].push(s);
     });
 
-    // Stats nổi bật
-    const stats = {
-      sales: sales.length,
-      orgs: orgs.length,
-      projects: (typeof PROJECTS !== 'undefined') ? PROJECTS.length : 0,
-      units: 176 // tổng quỹ căn từ Sa bàn
-    };
-
     const html = `
-      <div class="lg-shell">
-        <!-- Animated background -->
-        <div class="lg-bg">
-          <div class="lg-orb lg-orb-1"></div>
-          <div class="lg-orb lg-orb-2"></div>
-          <div class="lg-orb lg-orb-3"></div>
-          <svg class="lg-grid" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <pattern id="grid" width="6" height="6" patternUnits="userSpaceOnUse">
-                <path d="M 6 0 L 0 0 0 6" fill="none" stroke="rgba(255,255,255,.04)" stroke-width=".4"/>
-              </pattern>
-            </defs>
-            <rect width="100" height="100" fill="url(#grid)"/>
-          </svg>
+      <div class="lg-page">
+        <!-- HERO BACKGROUND: dự án FUTA Land -->
+        <div class="lg-hero">
+          ${heroSVG()}
+          <div class="lg-hero-overlay"></div>
         </div>
 
-        <!-- Left: form card -->
-        <div class="lg-left">
+        <!-- TOP BAR -->
+        <div class="lg-topbar">
+          <div class="lg-topbar-brand">
+            <img src="../assets/img/logo-futa-land.png" alt="FUTA Land">
+            <strong>FUTA Land</strong>
+            <span>· Chất lượng là danh dự</span>
+          </div>
+          <div class="lg-topbar-meta">
+            📞 Hotline <strong>1900 6067</strong> ·
+            <a href="huong-dan-test.html">Hướng dẫn cho người test ↗</a>
+          </div>
+        </div>
+
+        <!-- CARD ĐĂNG NHẬP Ở GIỮA -->
+        <div class="lg-center">
           <div class="lg-card">
             <div class="lg-card-head">
               <div class="lg-logo-wrap">
                 <img src="../assets/img/logo-futa-land.png" alt="FUTA Land" class="lg-logo">
-                <div class="lg-logo-ring"></div>
               </div>
-              <h1 class="lg-title">FUTA <span>Hub</span></h1>
-              <p class="lg-subtitle">CRM Sale Nội Bộ · v2.0</p>
+              <h1 class="lg-title">FUTA Hub <span>CRM</span></h1>
+              <p class="lg-subtitle">Hệ thống quản lý sale &amp; khách hàng nội bộ</p>
             </div>
 
             <div class="lg-tabs">
               <button class="lg-tab active" data-tab="cred" onclick="Login.switchTab('cred')">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                Email & Mật khẩu
+                Email &amp; Mật khẩu
               </button>
               <button class="lg-tab" data-tab="demo" onclick="Login.switchTab('demo')">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
@@ -136,19 +130,17 @@ const Login = (function () {
               </button>
 
               <div class="lg-suggest">
-                <strong>💡 Gợi ý nhanh:</strong>
-                <button onclick="Login.fillCred('admin@futaland.vn','tdn')">👑 Admin CĐT</button>
-                <button onclick="Login.fillCred('duy.phamhong@futaland.vn','phd')">👔 GĐ sàn FUTA</button>
-                <button onclick="Login.fillCred('khoa@abcland.vn','dvk')">🤝 GĐ sàn ABC</button>
+                <strong>Gợi ý:</strong>
+                <button onclick="Login.fillCred('admin@futaland.vn','tdn')">👑 Admin</button>
+                <button onclick="Login.fillCred('duy.phamhong@futaland.vn','phd')">👔 GĐ FUTA</button>
+                <button onclick="Login.fillCred('khoa@abcland.vn','dvk')">🤝 GĐ ABC</button>
                 <button onclick="Login.fillCred('tu.le@futaland.vn','lct')">👤 TVV</button>
               </div>
             </div>
 
             <!-- Tab Demo -->
             <div id="loginDemoTab" class="lg-body" hidden>
-              <p class="lg-demo-note">
-                Bỏ qua mật khẩu. Chọn tài khoản để vào ngay với vai trò tương ứng.
-              </p>
+              <p class="lg-demo-note">Bỏ qua mật khẩu. Chọn tài khoản để vào ngay với vai trò tương ứng.</p>
               <label class="lg-field">
                 <span class="lg-label">CHỌN TÀI KHOẢN</span>
                 <div class="lg-input-wrap">
@@ -173,102 +165,22 @@ const Login = (function () {
             </div>
 
             <div class="lg-foot">
-              <span>FUTA Land · Chất lượng là danh dự</span>
-              <span class="lg-foot-ver">v2.0</span>
+              <span>© 2026 FUTA Land</span>
+              <span class="lg-foot-ver">v2.1</span>
             </div>
           </div>
         </div>
 
-        <!-- Right: hero illustration + stats -->
-        <div class="lg-right">
-          <div class="lg-right-inner">
-            <div class="lg-badge">✨ FUTA Hub · CRM Sale Nội Bộ</div>
-            <h2 class="lg-headline">
-              Quản lý <span class="lg-gradient">khách hàng</span> &<br>
-              vận hành <span class="lg-gradient">đa sàn</span><br>
-              trên một nền tảng.
-            </h2>
-            <p class="lg-tagline">
-              Tích hợp Sa bàn số · Pipeline · AI Insight · Báo cáo lãnh đạo ·
-              Phân quyền đa cấp giữa CĐT và mạng lưới sàn phân phối.
-            </p>
-
-            <!-- Skyline SVG -->
-            <div class="lg-skyline">
-              <svg viewBox="0 0 600 220" preserveAspectRatio="xMidYEnd meet">
-                <defs>
-                  <linearGradient id="skybg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="rgba(255,255,255,.08)"/>
-                    <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
-                  </linearGradient>
-                  <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#fbbf24"/>
-                    <stop offset="100%" stop-color="#f59e0b"/>
-                  </linearGradient>
-                  <linearGradient id="b1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="rgba(255,255,255,.18)"/>
-                    <stop offset="100%" stop-color="rgba(255,255,255,.04)"/>
-                  </linearGradient>
-                </defs>
-                <!-- Sun glow -->
-                <circle cx="480" cy="120" r="45" fill="url(#sun)" opacity=".22"/>
-                <circle cx="480" cy="120" r="28" fill="url(#sun)" opacity=".5"/>
-                <circle cx="480" cy="120" r="18" fill="url(#sun)"/>
-                <!-- Back row -->
-                <g opacity=".55">
-                  <rect x="40"  y="100" width="50" height="120" fill="url(#b1)" rx="3"/>
-                  <rect x="100" y="80"  width="40" height="140" fill="url(#b1)" rx="3"/>
-                  <rect x="150" y="110" width="55" height="110" fill="url(#b1)" rx="3"/>
-                  <rect x="215" y="90"  width="45" height="130" fill="url(#b1)" rx="3"/>
-                  <rect x="270" y="120" width="60" height="100" fill="url(#b1)" rx="3"/>
-                  <rect x="340" y="95"  width="50" height="125" fill="url(#b1)" rx="3"/>
-                  <rect x="400" y="115" width="42" height="105" fill="url(#b1)" rx="3"/>
-                  <rect x="452" y="85"  width="48" height="135" fill="url(#b1)" rx="3"/>
-                  <rect x="510" y="105" width="55" height="115" fill="url(#b1)" rx="3"/>
-                </g>
-                <!-- Front taller buildings -->
-                <g>
-                  <rect x="60"  y="60"  width="55" height="160" fill="rgba(255,255,255,.16)" rx="4"/>
-                  <rect x="130" y="40"  width="45" height="180" fill="rgba(255,255,255,.2)" rx="4"/>
-                  <rect x="185" y="70"  width="60" height="150" fill="rgba(255,255,255,.14)" rx="4"/>
-                  <rect x="260" y="30"  width="50" height="190" fill="rgba(255,255,255,.22)" rx="4"/>
-                  <rect x="325" y="55"  width="55" height="165" fill="rgba(255,255,255,.18)" rx="4"/>
-                  <rect x="395" y="75"  width="48" height="145" fill="rgba(255,255,255,.14)" rx="4"/>
-                </g>
-                <!-- Windows pattern on front buildings -->
-                <g fill="rgba(255,255,255,.35)">
-                  ${Array.from({length: 6}).map((_,i)=>Array.from({length: 4}).map((_,j)=>`<rect x="${68+j*12}" y="${72+i*22}" width="6" height="10" rx="1"/>`).join('')).join('')}
-                  ${Array.from({length: 7}).map((_,i)=>Array.from({length: 3}).map((_,j)=>`<rect x="${137+j*12}" y="${52+i*22}" width="6" height="10" rx="1"/>`).join('')).join('')}
-                  ${Array.from({length: 6}).map((_,i)=>Array.from({length: 4}).map((_,j)=>`<rect x="${193+j*12}" y="${82+i*22}" width="6" height="10" rx="1"/>`).join('')).join('')}
-                  ${Array.from({length: 7}).map((_,i)=>Array.from({length: 3}).map((_,j)=>`<rect x="${268+j*12}" y="${42+i*22}" width="6" height="10" rx="1"/>`).join('')).join('')}
-                  ${Array.from({length: 6}).map((_,i)=>Array.from({length: 4}).map((_,j)=>`<rect x="${333+j*12}" y="${67+i*22}" width="6" height="10" rx="1"/>`).join('')).join('')}
-                  ${Array.from({length: 6}).map((_,i)=>Array.from({length: 3}).map((_,j)=>`<rect x="${403+j*12}" y="${87+i*22}" width="6" height="10" rx="1"/>`).join('')).join('')}
-                </g>
-              </svg>
+        <!-- BOTTOM BAR: stack of project chips -->
+        <div class="lg-bottom">
+          <div class="lg-projects">
+            <div class="lg-proj-chip">
+              <span class="lg-proj-icon">🏢</span>
+              <div><strong>FUTA Sky Garden</strong><div>Quận 2 · Bàn giao Q4/2026</div></div>
             </div>
-
-            <div class="lg-stats">
-              <div class="lg-stat">
-                <div class="lg-stat-num">${stats.orgs}</div>
-                <div class="lg-stat-label">Đơn vị bán hàng</div>
-              </div>
-              <div class="lg-stat">
-                <div class="lg-stat-num">${stats.sales}</div>
-                <div class="lg-stat-label">Nhân sự sale</div>
-              </div>
-              <div class="lg-stat">
-                <div class="lg-stat-num">${stats.projects}</div>
-                <div class="lg-stat-label">Dự án</div>
-              </div>
-              <div class="lg-stat">
-                <div class="lg-stat-num">${stats.units}</div>
-                <div class="lg-stat-label">Sản phẩm</div>
-              </div>
-            </div>
-
-            <div class="lg-right-foot">
-              <div>📞 Hỗ trợ: <strong>1900 6067</strong></div>
-              <a href="huong-dan-test.html">Hướng dẫn cho người test →</a>
+            <div class="lg-proj-chip">
+              <span class="lg-proj-icon">🏡</span>
+              <div><strong>FUTA Riverside Villas</strong><div>Đảo Kim Cương · Bàn giao Q2/2027</div></div>
             </div>
           </div>
         </div>
@@ -276,7 +188,6 @@ const Login = (function () {
     `;
     document.body.innerHTML = html;
 
-    // Wire keyboard
     document.getElementById('loginPassword').addEventListener('keydown', e => {
       if (e.key === 'Enter') submitCredentials();
     });
@@ -284,6 +195,180 @@ const Login = (function () {
       if (e.key === 'Enter') document.getElementById('loginPassword').focus();
     });
     setTimeout(() => document.getElementById('loginEmail').focus(), 200);
+  }
+
+  /* ----------- SVG HERO: skyline dự án FUTA Land ----------- */
+  function heroSVG() {
+    return `
+      <svg class="lg-hero-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#0a3814"/>
+            <stop offset="35%" stop-color="#1B5E20"/>
+            <stop offset="70%" stop-color="#2E7D32"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+          <linearGradient id="sunglow" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#fbbf24" stop-opacity=".0"/>
+            <stop offset="60%" stop-color="#fbbf24" stop-opacity=".25"/>
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity=".5"/>
+          </linearGradient>
+          <linearGradient id="bldFront" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#1f4d24"/>
+            <stop offset="100%" stop-color="#0a2c0e"/>
+          </linearGradient>
+          <linearGradient id="bldMid" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#2E7D32" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#1B5E20" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#0a3814" stop-opacity=".4"/>
+            <stop offset="100%" stop-color="#072408"/>
+          </linearGradient>
+          <radialGradient id="sunBall" cx=".5" cy=".5">
+            <stop offset="0%"  stop-color="#fef3c7"/>
+            <stop offset="60%" stop-color="#fbbf24"/>
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity=".7"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Bầu trời -->
+        <rect width="1600" height="900" fill="url(#sky)"/>
+
+        <!-- Mặt trời -->
+        <ellipse cx="1200" cy="520" rx="600" ry="380" fill="url(#sunglow)"/>
+        <circle cx="1200" cy="520" r="90" fill="url(#sunBall)"/>
+
+        <!-- Mây mỏng -->
+        <g fill="rgba(255,255,255,.08)">
+          <ellipse cx="300" cy="200" rx="180" ry="14"/>
+          <ellipse cx="600" cy="160" rx="220" ry="12"/>
+          <ellipse cx="1000" cy="240" rx="160" ry="10"/>
+        </g>
+
+        <!-- Hàng tòa nhà sau (xa) -->
+        <g opacity=".5">
+          ${apartmentBuildings(50, 540, 70, 280, 7, '#2E7D32', '#1B5E20', .4)}
+        </g>
+
+        <!-- Hàng tòa nhà giữa -->
+        <g opacity=".75">
+          ${apartmentBuildings(120, 480, 90, 340, 5, '#1f4d24', '#0F3D14', .65)}
+        </g>
+
+        <!-- Hàng tòa nhà trước (cao nhất, sắc nét) -->
+        ${frontTowers()}
+
+        <!-- Cảnh quan: cây + mặt nước phản chiếu -->
+        <g>
+          <rect x="0" y="780" width="1600" height="120" fill="url(#water)"/>
+          <!-- gợn nước -->
+          <g stroke="rgba(255,255,255,.08)" stroke-width="1" fill="none">
+            <path d="M 0 820 Q 200 815 400 820 T 800 820 T 1200 820 T 1600 820"/>
+            <path d="M 0 850 Q 200 845 400 850 T 800 850 T 1200 850 T 1600 850"/>
+            <path d="M 0 875 Q 200 870 400 875 T 800 875 T 1200 875 T 1600 875"/>
+          </g>
+          <!-- cây 2 bên -->
+          ${trees()}
+        </g>
+
+        <!-- Đèn cửa sổ (highlight) -->
+        ${windowLights()}
+      </svg>
+    `;
+  }
+
+  function apartmentBuildings(startX, baseY, minH, maxH, count, color1, color2, opacity) {
+    let svg = '';
+    const totalW = 1600 - startX * 2;
+    const w = totalW / count - 8;
+    for (let i = 0; i < count; i++) {
+      const x = startX + i * (w + 8);
+      const h = minH + ((i * 53) % (maxH - minH));
+      const y = baseY - h;
+      svg += `<rect x="${x}" y="${y}" width="${w}" height="${h + 120}" fill="${i % 2 === 0 ? color1 : color2}" opacity="${opacity}" rx="3"/>`;
+    }
+    return svg;
+  }
+
+  function frontTowers() {
+    // 5 tòa cao FUTA Sky Garden lấy giữa khung
+    const towers = [
+      { x: 200, y: 280, w: 110, h: 500 },
+      { x: 340, y: 200, w: 130, h: 580 },
+      { x: 500, y: 320, w: 110, h: 460 },
+      { x: 640, y: 180, w: 150, h: 600 },
+      { x: 820, y: 260, w: 120, h: 520 },
+      { x: 970, y: 220, w: 130, h: 560 },
+      { x: 1130, y: 300, w: 120, h: 480 },
+      { x: 1280, y: 250, w: 140, h: 530 },
+    ];
+    return towers.map(t => `
+      <g>
+        <rect x="${t.x}" y="${t.y}" width="${t.w}" height="${t.h}" fill="url(#bldFront)" rx="4"/>
+        <!-- vạch viền dọc 1 bên -->
+        <rect x="${t.x}" y="${t.y}" width="3" height="${t.h}" fill="rgba(255,255,255,.12)"/>
+        <!-- mái -->
+        <rect x="${t.x - 4}" y="${t.y - 6}" width="${t.w + 8}" height="6" fill="#0a2c0e"/>
+        <!-- antenna -->
+        <line x1="${t.x + t.w/2}" y1="${t.y - 6}" x2="${t.x + t.w/2}" y2="${t.y - 28}" stroke="rgba(255,255,255,.25)" stroke-width="2"/>
+      </g>
+    `).join('');
+  }
+
+  function windowLights() {
+    // Sinh windows cho 8 tòa với pattern khác nhau
+    const towers = [
+      { x: 200, y: 280, w: 110, h: 500 },
+      { x: 340, y: 200, w: 130, h: 580 },
+      { x: 500, y: 320, w: 110, h: 460 },
+      { x: 640, y: 180, w: 150, h: 600 },
+      { x: 820, y: 260, w: 120, h: 520 },
+      { x: 970, y: 220, w: 130, h: 560 },
+      { x: 1130, y: 300, w: 120, h: 480 },
+      { x: 1280, y: 250, w: 140, h: 530 },
+    ];
+    let svg = '';
+    towers.forEach((t, i) => {
+      const cols = Math.floor(t.w / 22);
+      const rows = Math.floor(t.h / 28);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          // Lit pattern (deterministic)
+          const lit = ((r * 7 + c * 13 + i * 17) % 11) < 4;
+          const fill = lit ? 'rgba(251, 191, 36, .85)' : 'rgba(255,255,255,.06)';
+          svg += `<rect x="${t.x + 10 + c * 22}" y="${t.y + 20 + r * 28}" width="10" height="14" rx="1" fill="${fill}"/>`;
+        }
+      }
+    });
+    return svg;
+  }
+
+  function trees() {
+    let svg = '';
+    // cây bên trái
+    for (let i = 0; i < 6; i++) {
+      const x = 30 + i * 28;
+      const h = 70 + (i % 3) * 20;
+      svg += treeAt(x, 800, h);
+    }
+    // cây bên phải
+    for (let i = 0; i < 6; i++) {
+      const x = 1450 + i * 28;
+      const h = 70 + (i % 3) * 20;
+      svg += treeAt(x, 800, h);
+    }
+    return svg;
+  }
+
+  function treeAt(x, baseY, h) {
+    return `
+      <g>
+        <rect x="${x - 1}" y="${baseY - h * .4}" width="3" height="${h * .4}" fill="#1a2e15"/>
+        <ellipse cx="${x}" cy="${baseY - h * .6}" rx="${h * .25}" ry="${h * .35}" fill="#0a3814"/>
+        <ellipse cx="${x}" cy="${baseY - h * .75}" rx="${h * .2}" ry="${h * .3}" fill="#0f4a18"/>
+      </g>
+    `;
   }
 
   function switchTab(t) {
@@ -297,7 +382,7 @@ const Login = (function () {
     const icon = document.getElementById('lgEyeIcon');
     if (inp.type === 'password') {
       inp.type = 'text';
-      icon.innerHTML = '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>';
+      icon.innerHTML = '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2z"/>';
     } else {
       inp.type = 'password';
       icon.innerHTML = '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>';
@@ -345,9 +430,8 @@ const Login = (function () {
   function loginAs(user, remember) {
     Storage.setCurrentUser(user);
     saveSession(user.id, remember);
-    // Animation thoát: fade trước khi reload
-    document.querySelector('.lg-shell').style.transition = 'opacity .4s';
-    document.querySelector('.lg-shell').style.opacity = '0';
+    const page = document.querySelector('.lg-page');
+    if (page) { page.style.transition = 'opacity .4s'; page.style.opacity = '0'; }
     setTimeout(() => location.reload(), 400);
   }
 
