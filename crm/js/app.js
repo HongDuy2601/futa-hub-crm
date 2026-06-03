@@ -305,8 +305,17 @@ const App = (function () {
 
   /* ----------- BOOT ----------- */
   function boot() {
-    setupPWA();
+    // Tải cấu hình & seed trước (Login cần đọc danh sách user)
     if (typeof Sync !== 'undefined') Sync.applyDefaultConfig();
+    Storage.initSeedIfNeeded();
+
+    // Check login — nếu chưa thì hiện màn hình đăng nhập
+    if (typeof Login !== 'undefined' && !Login.isLoggedIn()) {
+      Login.render();
+      return;
+    }
+
+    setupPWA();
     wireEvents();
 
     const cloud = (typeof Sync !== 'undefined') && Sync.isConfigured() && Sync.isOnline();
@@ -314,16 +323,10 @@ const App = (function () {
       document.getElementById('pageContent').innerHTML =
         '<div class="loading">☁️ Đang tải dữ liệu dùng chung từ Supabase...</div>';
       Sync.pullAll()
-        .then(rows => {
-          if (!rows) { Storage.initSeedIfNeeded(); return Sync.pushAll(); }
-        })
-        .catch(() => {
-          Storage.initSeedIfNeeded();
-          toast('Không kết nối được cloud — đang dùng dữ liệu offline', 'warning');
-        })
+        .then(rows => { if (!rows) return Sync.pushAll(); })
+        .catch(() => toast('Không kết nối được cloud — đang dùng dữ liệu offline', 'warning'))
         .then(afterData);
     } else {
-      Storage.initSeedIfNeeded();
       afterData();
     }
   }

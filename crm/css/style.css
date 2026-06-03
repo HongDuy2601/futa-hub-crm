@@ -1095,6 +1095,166 @@ table.data-table tr:last-child td { border-bottom: none; }
 .kpi-card { position: relative; }
 
 /* ============================================================
+ * LOGIN SCREEN
+ * ============================================================ */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: linear-gradient(135deg, var(--futa-green-dark) 0%, var(--futa-green) 50%, #2E7D32 100%);
+  overflow: auto;
+}
+.login-bg-pattern {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .08;
+  background:
+    radial-gradient(circle at 10% 20%, white 0, transparent 30%),
+    radial-gradient(circle at 90% 70%, white 0, transparent 25%),
+    repeating-linear-gradient(45deg, transparent 0 60px, rgba(255,255,255,.1) 60px 61px);
+}
+.login-card {
+  background: white;
+  margin: auto;
+  padding: 2rem 2.25rem;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.4);
+  position: relative;
+  z-index: 1;
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--gray-100);
+  margin-bottom: 1.25rem;
+}
+.login-brand img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  padding: 6px;
+  background: var(--futa-green-light);
+  border-radius: 12px;
+}
+.login-brand h1 {
+  font-size: 1.4rem;
+  color: var(--futa-green-dark);
+  letter-spacing: -.3px;
+}
+.login-brand p { color: var(--gray-500); font-size: .85rem; }
+.login-tabs {
+  display: flex;
+  gap: .25rem;
+  background: var(--gray-100);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+}
+.login-tab {
+  flex: 1;
+  padding: .55rem .75rem;
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: .82rem;
+  color: var(--gray-700);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all .12s;
+}
+.login-tab:hover { color: var(--futa-green-dark); }
+.login-tab.active { background: white; color: var(--futa-green-dark); box-shadow: var(--shadow-sm); }
+.login-body .form-field { margin-bottom: 1rem; }
+.login-body input,
+.login-body select {
+  width: 100%;
+  padding: .65rem .85rem;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 10px;
+  font-size: .92rem;
+  outline: none;
+  transition: border .15s;
+}
+.login-body input:focus,
+.login-body select:focus { border-color: var(--futa-green); box-shadow: 0 0 0 4px var(--futa-green-light); }
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .82rem;
+  color: var(--gray-700);
+  margin-bottom: 1rem;
+  cursor: pointer;
+  user-select: none;
+}
+.login-error {
+  background: #fee2e2;
+  color: #7f1d1d;
+  padding: .55rem .85rem;
+  border-radius: 8px;
+  font-size: .82rem;
+  margin-bottom: .85rem;
+  border-left: 3px solid #dc2626;
+}
+.login-submit {
+  width: 100%;
+  padding: .75rem;
+  font-size: .95rem;
+  border-radius: 10px;
+}
+.login-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gray-100);
+  font-size: .75rem;
+  color: var(--gray-500);
+}
+.login-aside {
+  padding: 3rem;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+.login-aside h2 {
+  font-size: 2rem;
+  letter-spacing: -.5px;
+  margin-bottom: 1.25rem;
+  text-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.login-aside ul { list-style: none; display: grid; gap: .65rem; margin-bottom: 2rem; }
+.login-aside li {
+  font-size: .95rem;
+  padding-left: .25rem;
+  opacity: .92;
+}
+.login-aside-foot {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,.18);
+  font-size: .85rem;
+  opacity: .88;
+}
+.login-aside-foot a { color: white; text-decoration: underline; font-weight: 600; display: inline-block; margin-top: .35rem; }
+
+@media (max-width: 900px) {
+  .login-screen { grid-template-columns: 1fr; }
+  .login-aside { display: none; }
+  .login-card { margin: 1.5rem; }
+}
+
+/* ============================================================
  * USER PICKER (switch role demo) + ROLE BADGE
  * ============================================================ */
 .user-pick {
