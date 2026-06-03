@@ -8,6 +8,14 @@
 
 const Perm = (function () {
 
+  /* ----------- Raw storage helpers — TRÁNH ĐỆ QUY ----------- *
+   * Vì Storage.getX bị App wrap qua Perm.filterX, mọi nơi trong
+   * Perm phải gọi raw để không tự đệ quy.
+   * ------------------------------------------------------------ */
+  function rawSales()  { return (Storage._raw && Storage._raw.getSales)  ? Storage._raw.getSales()  : Storage.getSales(); }
+  function rawLeads()  { return (Storage._raw && Storage._raw.getLeads)  ? Storage._raw.getLeads()  : Storage.getLeads(); }
+  function rawDeals()  { return (Storage._raw && Storage._raw.getDeals)  ? Storage._raw.getDeals()  : Storage.getDeals(); }
+
   /* ----------- Current user + role ----------- */
   function me() {
     return Storage.getCurrentUser();
@@ -28,7 +36,7 @@ const Perm = (function () {
   function visibleSalesIds() {
     const m = me();
     const r = role();
-    const allSales = Storage.getSales();
+    const allSales = rawSales();   // ← RAW, không wrap
 
     if (r.scope === 'all' || r.scope === 'all_readonly') {
       return allSales.map(s => s.id); // admin + readonly thấy hết

@@ -3,7 +3,7 @@
  * Cache app shell để chạy offline hoàn toàn (cài như app)
  * ============================================================ */
 
-const CACHE_NAME = 'futa-crm-v2.4';
+const CACHE_NAME = 'futa-crm-v2.5';
 const ASSETS = [
   './',
   './index.html',
