@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>Reset · FUTA Hub CRM</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+         background: linear-gradient(135deg, #0F3D14, #1B5E20, #2E7D32);
+         min-height: 100vh; margin: 0; display: grid; place-items: center; color: white; padding: 1.5rem; }
+  .card { background: rgba(255,255,255,.06); backdrop-filter: blur(20px); padding: 2rem; border-radius: 20px;
+          max-width: 480px; width: 100%; border: 1px solid rgba(255,255,255,.15); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  h1 { font-size: 1.5rem; letter-spacing: -.5px; margin-bottom: .35rem; }
+  p { opacity: .85; font-size: .92rem; line-height: 1.5; }
+  ul { margin: 1.25rem 0; padding: 0; list-style: none; }
+  li { padding: .65rem .85rem; background: rgba(0,0,0,.18); border-radius: 10px; margin-bottom: .4rem;
+       display: flex; align-items: center; gap: .65rem; font-size: .92rem; }
+  li.ok::before { content: '✅'; }
+  li.run::before { content: '⏳'; animation: spin 1s linear infinite; }
+  li.err::before { content: '❌'; }
+  li.wait::before { content: '◯'; opacity: .4; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+         padding: .85rem 1.5rem; border-radius: 12px; border: none; font-weight: 700; font-size: 1rem;
+         cursor: pointer; transition: all .15s; text-decoration: none; color: white;
+         background: linear-gradient(135deg, #1B5E20, #43A047); box-shadow: 0 8px 20px -4px rgba(0,0,0,.4);
+         width: 100%; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 24px -4px rgba(0,0,0,.5); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .log { background: rgba(0,0,0,.3); padding: .75rem; border-radius: 8px; font-family: ui-monospace, monospace;
+         font-size: .78rem; max-height: 180px; overflow: auto; white-space: pre-wrap; margin-top: 1rem; }
+  .done { background: rgba(34,197,94,.18); border-left: 4px solid #22c55e; padding: 1rem; border-radius: 10px;
+          margin-top: 1rem; }
+  .meta { font-size: .75rem; opacity: .6; margin-top: 1rem; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔄 Reset FUTA Hub CRM</h1>
+    <p>Xoá sạch cache cũ trên máy và tải lại bản mới nhất từ server.</p>
+    <p style="font-size:.82rem;margin-top:.5rem;opacity:.7">⚠️ Sẽ xoá session đăng nhập và data local — anh sẽ phải đăng nhập lại.</p>
+
+    <ul id="steps">
+      <li id="s1" class="wait">Huỷ đăng ký Service Worker</li>
+      <li id="s2" class="wait">Xoá cache trình duyệt</li>
+      <li id="s3" class="wait">Xoá session đăng nhập + data local</li>
+      <li id="s4" class="wait">Verify bản mới (v2.5)</li>
+    </ul>
+
+    <button class="btn" id="resetBtn" onclick="doReset()">🔄 Bắt đầu reset</button>
+
+    <div class="log" id="log" hidden></div>
+    <div class="done" id="done" hidden>
+      ✅ <strong>Reset xong!</strong>
+      <div style="margin-top:.5rem;font-size:.85rem">App sẽ tự mở sau 2 giây. Hoặc bấm nút bên dưới:</div>
+      <a href="index.html" class="btn" style="margin-top:.75rem">→ Vào CRM</a>
+    </div>
+
+    <div class="meta">FUTA Land · CRM Reset Tool · <span id="ua"></span></div>
+  </div>
+
+<script>
+const log = (msg) => {
+  const el = document.getElementById('log');
+  el.hidden = false;
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+};
+const setStep = (id, state) => {
+  const el = document.getElementById(id);
+  if (el) el.className = state;
+};
+
+document.getElementById('ua').textContent = navigator.userAgent.split(') ').pop();
+
+async function doReset() {
+  const btn = document.getElementById('resetBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang reset...';
+
+  // 1. Unregister service workers
+  setStep('s1', 'run');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      log('Tìm thấy ' + regs.length + ' service worker(s)');
+      for (const r of regs) {
+        const ok = await r.unregister();
+        log('  Unregister ' + (r.scope || 'unknown') + ' → ' + (ok ? 'OK' : 'FAIL'));
+      }
+    } else log('Trình duyệt không hỗ trợ SW');
+    setStep('s1', 'ok');
+  } catch (e) { log('SW error: ' + e.message); setStep('s1', 'err'); }
+
+  // 2. Clear all caches
+  setStep('s2', 'run');
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      log('Tìm thấy ' + keys.length + ' cache(s): ' + keys.join(', '));
+      for (const k of keys) {
+        await caches.delete(k);
+        log('  Xoá cache: ' + k);
+      }
+    } else log('Trình duyệt không hỗ trợ Cache API');
+    setStep('s2', 'ok');
+  } catch (e) { log('Cache error: ' + e.message); setStep('s2', 'err'); }
+
+  // 3. Clear localStorage + sessionStorage
+  setStep('s3', 'run');
+  try {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('futa_crm_'));
+    log('Tìm thấy ' + keys.length + ' khoá localStorage');
+    keys.forEach(k => {
+      log('  Xoá: ' + k);
+      localStorage.removeItem(k);
+    });
+    sessionStorage.clear();
+    setStep('s3', 'ok');
+  } catch (e) { log('Storage error: ' + e.message); setStep('s3', 'err'); }
+
+  // 4. Verify mới
+  setStep('s4', 'run');
+  try {
+    const resp = await fetch('service-worker.js?nocache=' + Date.now(), { cache: 'no-store' });
+    const txt = await resp.text();
+    const m = txt.match(/CACHE_NAME = ['"]([^'"]+)['"]/);
+    if (m) {
+      log('Server đang dùng: ' + m[1]);
+      if (m[1] >= 'futa-crm-v2.5') { setStep('s4', 'ok'); }
+      else { log('⚠ Server chưa cập nhật v2.5?'); setStep('s4', 'err'); }
+    }
+  } catch (e) { log('Fetch error: ' + e.message); setStep('s4', 'err'); }
+
+  // Done
+  document.getElementById('done').hidden = false;
+  btn.style.display = 'none';
+
+  // Auto redirect sau 2s
+  setTimeout(() => { location.href = 'index.html'; }, 2000);
+}
+</script>
+</body>
+</html>

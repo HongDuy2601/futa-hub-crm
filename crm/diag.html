@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>Chẩn đoán · FUTA Hub CRM</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  body { padding: 1.5rem; }
+  .diag-card { background:white;padding:1.25rem 1.5rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.08);margin-bottom:1rem; }
+  .diag-card h3 { color:var(--futa-green-dark);margin-bottom:.75rem; }
+  .row { display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid #f3f4f6;font-size:.9rem; }
+  .row:last-child { border:none; }
+  .row .label { color:#6b7280; }
+  .row .val { font-weight:600; font-family:ui-monospace,monospace; }
+  .row .val.ok { color:#16a34a; }
+  .row .val.err { color:#dc2626; }
+  .row .val.warn { color:#f59e0b; }
+  pre { background:#0F2010;color:#86efac;padding:.85rem 1rem;border-radius:8px;font-size:.78rem;overflow:auto;max-height:200px; }
+</style>
+</head>
+<body>
+  <h1 style="color:var(--futa-green-dark);margin-bottom:1rem">🔍 Chẩn đoán FUTA Hub CRM</h1>
+  <p style="color:#6b7280;margin-bottom:1rem">Trang này hiện trạng thái hệ thống để debug. Anh chụp lại và gửi cho dev.</p>
+
+  <div id="output">Đang chẩn đoán...</div>
+
+  <div style="margin-top:1.25rem;display:flex;gap:.5rem;flex-wrap:wrap">
+    <a href="index.html" class="btn btn-primary">→ Vào CRM</a>
+    <a href="reset.html" class="btn btn-danger">🔄 Reset toàn bộ</a>
+    <button class="btn btn-secondary" onclick="copyReport()">📋 Copy báo cáo</button>
+  </div>
+
+<script src="../assets/js/data.js"></script>
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/permissions.js"></script>
+<script src="js/sync.js"></script>
+<script>
+async function diag() {
+  const lines = [];
+  const out = document.getElementById('output');
+  const sec = (title, items) => `
+    <div class="diag-card">
+      <h3>${title}</h3>
+      ${items.map(([l,v,cls]) => `<div class="row"><span class="label">${l}</span><span class="val ${cls||''}">${v}</span></div>`).join('')}
+    </div>`;
+
+  // 1. Browser
+  const browserInfo = [
+    ['User-Agent', navigator.userAgent.split(') ').slice(-1)[0]],
+    ['Online', navigator.onLine ? '✓ Online' : '✗ Offline', navigator.onLine ? 'ok' : 'err'],
+    ['Service Worker', 'serviceWorker' in navigator ? '✓ Hỗ trợ' : 'Không'],
+  ];
+
+  // 2. Service worker state
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    browserInfo.push(['SW đã đăng ký', regs.length + ' worker(s)']);
+    regs.forEach((r, i) => {
+      browserInfo.push(['  SW #' + (i+1) + ' state', r.active ? r.active.state + ' (' + r.active.scriptURL.split('/').pop() + ')' : 'inactive']);
+    });
+  }
+
+  // 3. Cache version live
+  let liveCacheName = 'unknown';
+  try {
+    const r = await fetch('service-worker.js?nc=' + Date.now(), { cache:'no-store' });
+    const txt = await r.text();
+    const m = txt.match(/CACHE_NAME = ['"]([^'"]+)['"]/);
+    if (m) liveCacheName = m[1];
+  } catch(e) {}
+  browserInfo.push(['Bản trên server', liveCacheName, liveCacheName.includes('v2.5') ? 'ok' : 'warn']);
+
+  // 4. Caches trong browser
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    browserInfo.push(['Cache trong browser', keys.join(', ') || '(rỗng)']);
+  }
+
+  // 5. localStorage
+  const lsKeys = Object.keys(localStorage).filter(k => k.startsWith('futa_crm_'));
+  const session = localStorage.getItem('futa_crm_session');
+  const settings = Storage.getSettings();
+
+  const lsInfo = [
+    ['Số khoá futa_crm_*', lsKeys.length + ''],
+    ['Đã đăng nhập', session ? '✓ Có' : '✗ Chưa', session ? 'ok' : 'warn'],
+  ];
+  if (session) {
+    try {
+      const s = JSON.parse(session);
+      const user = (Storage._raw && Storage._raw.getSales ? Storage._raw.getSales() : Storage.getSales()).find(u => u.id === s.userId);
+      if (user) {
+        const role = ROLES.find(r => r.id === user.roleId);
+        const org = Storage.getOrg(user.orgId);
+        lsInfo.push(['User đang dùng', user.name + ' (' + user.code + ')']);
+        lsInfo.push(['Email', user.email]);
+        lsInfo.push(['Role', role ? role.name + ' [' + role.scope + ']' : '?']);
+        lsInfo.push(['Org', org ? org.name : '?']);
+        lsInfo.push(['Team ID', user.teamId || '(không có)']);
+      }
+    } catch(e) {}
+  }
+
+  // 6. Sync config
+  const syncCfg = settings.sync || {};
+  const syncInfo = [
+    ['Supabase URL', syncCfg.url || '(không có)', syncCfg.url ? 'ok' : 'err'],
+    ['Anon Key', syncCfg.anonKey ? syncCfg.anonKey.slice(0, 25) + '...' : '(không có)', syncCfg.anonKey ? 'ok' : 'err'],
+    ['Auto-sync', syncCfg.autoSync === true ? '✓ Bật' : '✗ Tắt', syncCfg.autoSync ? 'ok' : 'warn'],
+    ['Last sync', syncCfg.lastSync ? new Date(syncCfg.lastSync).toLocaleString('vi-VN') : '(chưa)', syncCfg.lastSync ? 'ok' : 'warn'],
+    ['window.FUTA_CONFIG', window.FUTA_CONFIG ? '✓ Loaded ('+window.FUTA_CONFIG.supabaseUrl.slice(0,30)+'...)' : '✗ KHÔNG load', window.FUTA_CONFIG ? 'ok' : 'err'],
+  ];
+
+  // 7. Test Supabase connection
+  let connStatus = 'Chưa test';
+  let connClass = '';
+  if (syncCfg.url && syncCfg.anonKey) {
+    try {
+      const r = await fetch(syncCfg.url + '/rest/v1/futa_sync?select=collection&limit=1', {
+        headers: { apikey: syncCfg.anonKey, Authorization: 'Bearer ' + syncCfg.anonKey }
+      });
+      connStatus = 'HTTP ' + r.status + (r.ok ? ' ✓' : ' ✗');
+      connClass = r.ok ? 'ok' : 'err';
+    } catch (e) {
+      connStatus = 'Error: ' + e.message;
+      connClass = 'err';
+    }
+  }
+  syncInfo.push(['Test GET Supabase', connStatus, connClass]);
+
+  // 8. RAW vs FILTERED counts
+  const dataInfo = [];
+  try {
+    // Raw counts (không filter)
+    const rawL = Storage._raw && Storage._raw.getLeads ? Storage._raw.getLeads() : Storage.read(Storage.KEYS.leads, []);
+    const rawD = Storage._raw && Storage._raw.getDeals ? Storage._raw.getDeals() : Storage.read(Storage.KEYS.deals, []);
+    const rawS = Storage._raw && Storage._raw.getSales ? Storage._raw.getSales() : Storage.read(Storage.KEYS.sales, []);
+    dataInfo.push(['Leads (raw, không filter)', rawL.length + '']);
+    dataInfo.push(['Deals (raw)', rawD.length + '']);
+    dataInfo.push(['Sales (raw)', rawS.length + '']);
+    dataInfo.push(['Orgs', Storage.getOrgs().length + '']);
+    dataInfo.push(['Teams', Storage.getTeamsAll().length + '']);
+
+    // Filtered (qua Perm)
+    if (session) {
+      const filteredL = Perm.filterLeads(rawL);
+      const filteredD = Perm.filterDeals(rawD);
+      const filteredS = Perm.filterSales(rawS);
+      dataInfo.push(['Leads BẠN ĐƯỢC XEM', filteredL.length + ' / ' + rawL.length, filteredL.length > 0 ? 'ok' : 'err']);
+      dataInfo.push(['Deals BẠN ĐƯỢC XEM', filteredD.length + ' / ' + rawD.length, filteredD.length > 0 ? 'ok' : 'warn']);
+      dataInfo.push(['Sales BẠN ĐƯỢC XEM', filteredS.length + ' / ' + rawS.length, filteredS.length > 0 ? 'ok' : 'warn']);
+      // Scope details
+      const visSales = Perm.visibleSalesIds();
+      const visProj = Perm.visibleProjectIds();
+      dataInfo.push(['Visible sales IDs', visSales.length + ' (' + visSales.slice(0,5).join(', ') + (visSales.length>5?'...':'') + ')']);
+      dataInfo.push(['Visible project IDs', visProj.join(', ') || '(none)']);
+    }
+  } catch (e) {
+    dataInfo.push(['Lỗi đọc data', e.message, 'err']);
+  }
+
+  out.innerHTML =
+    sec('🌐 Trình duyệt & Service Worker', browserInfo) +
+    sec('💾 Phiên đăng nhập & User', lsInfo) +
+    sec('☁️ Cấu hình Supabase', syncInfo) +
+    sec('📊 Số lượng data', dataInfo);
+
+  // Build report text
+  window._report = [...browserInfo, ...lsInfo, ...syncInfo, ...dataInfo]
+    .map(([l,v]) => l + ': ' + v).join('\n');
+}
+
+function copyReport() {
+  navigator.clipboard.writeText(window._report || 'No data').then(() => alert('Đã copy báo cáo. Anh paste vào chat gửi em.'));
+}
+
+diag();
+</script>
+</body>
+</html>
