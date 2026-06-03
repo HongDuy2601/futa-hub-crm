@@ -26,7 +26,10 @@ const Sync = (function () {
   let autoTimer = null;
   let pollTimer = null;
   let applying = false;   // đang ghi data từ cloud → tạm ngưng auto-push
+  let dirty = false;      // local có thay đổi chưa push → polling không pull đè
   let lastSig = '';
+  const DEBUG = true;
+  function log() { if (DEBUG) console.log('[Sync]', ...arguments); }
 
   function cfg() {
     return (Storage.getSettings().sync) || {};
@@ -70,7 +73,8 @@ const Sync = (function () {
 
   // Đẩy toàn bộ local lên cloud (upsert)
   async function pushAll() {
-    if (!isConfigured() || !isOnline()) throw new Error('Không có kết nối');
+    if (!isConfigured()) throw new Error('Chưa cấu hình Supabase');
+    if (!isOnline()) throw new Error('Đang offline');
     const rows = [];
     Object.entries(COLLECTIONS).forEach(([col, key]) => {
       const data = Storage.read(key, col === 'inv' ? {} : []);
@@ -80,16 +84,21 @@ const Sync = (function () {
         data.forEach(item => rows.push({ collection: col, id: item.id, data: item }));
       }
     });
-    if (!rows.length) return 0;
-    // chunk 200/lần
+    if (!rows.length) { log('pushAll: nothing to push'); return 0; }
+    log('pushAll →', rows.length, 'rows');
     for (let i = 0; i < rows.length; i += 200) {
       const chunk = rows.slice(i, i + 200);
       const res = await fetch(restUrl('futa_sync'), {
         method: 'POST', headers: headers(), body: JSON.stringify(chunk)
       });
-      if (!res.ok) throw new Error('Push lỗi HTTP ' + res.status);
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        log('push FAIL HTTP', res.status, txt.slice(0, 200));
+        throw new Error('Push lỗi HTTP ' + res.status + ' – ' + txt.slice(0, 100));
+      }
     }
     markSynced();
+    dirty = false;
     return rows.length;
   }
 
@@ -137,35 +146,45 @@ const Sync = (function () {
     Storage.saveSettings(s);
   }
 
-  // Auto-sync: khi data đổi → debounce push
+  // Auto-sync: khi data đổi → đánh dấu dirty + debounce push
+  let _subscribed = false;
   function enableAutoSync() {
+    if (_subscribed) return;
+    _subscribed = true;
     Storage.subscribe(() => {
+      if (applying) return; // đang ghi từ cloud → bỏ qua
       const c = cfg();
-      if (applying || !c.autoSync || !isConfigured() || !isOnline()) return;
+      if (!c.autoSync || !isConfigured() || !isOnline()) return;
+      dirty = true;
+      log('local changed → schedule push');
       clearTimeout(autoTimer);
       autoTimer = setTimeout(() => {
-        pushAll().then(n => console.log('[Sync] auto-pushed', n)).catch(e => console.warn('[Sync] auto-push fail', e.message));
-      }, 2500);
+        pushAll()
+          .then(n => { log('auto-pushed', n, 'rows'); dirty = false; })
+          .catch(e => { console.warn('[Sync] auto-push fail', e.message); });
+      }, 1500);
     });
   }
 
-  // Poll định kỳ để thấy thay đổi của người khác (data dùng chung)
+  // Poll định kỳ để thấy thay đổi của người khác
   function startPolling(intervalMs) {
     stopPolling();
     if (!isConfigured()) return;
     lastSig = dataSignature();
+    log('start polling every', intervalMs || 20000, 'ms');
     pollTimer = setInterval(() => {
       if (!isConfigured() || !isOnline()) return;
-      // đừng phá khi đang mở modal (nhập liệu)
+      if (dirty) { log('skip poll — local dirty, waiting push'); return; }
       const ov = document.getElementById('modalOverlay');
       if (ov && !ov.hidden) return;
       pullAll().then(() => {
         const sig = dataSignature();
         if (sig !== lastSig) {
+          log('pulled new data — re-render');
           lastSig = sig;
           if (typeof App !== 'undefined') App.render();
         }
-      }).catch(() => {});
+      }).catch(e => log('poll-pull fail', e.message));
     }, intervalMs || 20000);
   }
   function stopPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
@@ -177,20 +196,24 @@ const Sync = (function () {
     return n;
   }
 
-  // Nạp cấu hình mặc định nhúng sẵn (config.js) nếu tester chưa tự nhập
+  // Nạp cấu hình mặc định nhúng sẵn (config.js)
+  // Ép áp dụng MỖI LẦN boot — vì là demo nội bộ, key nhúng cứng trong code
   function applyDefaultConfig() {
     try {
       const g = (typeof window !== 'undefined') && window.FUTA_CONFIG;
       if (!g || !g.supabaseUrl) return;
       const s = Storage.getSettings();
       s.sync = s.sync || {};
-      if (!s.sync.url) {
-        s.sync.url = g.supabaseUrl;
-        s.sync.anonKey = g.supabaseKey || '';
-        s.sync.autoSync = true;
-        Storage.saveSettings(s);
-      }
-    } catch (e) { /* ignore */ }
+      // Ép URL+key từ config nhúng (nếu user thay tay → giữ tay)
+      if (s.sync.url !== g.supabaseUrl) s.sync.url = g.supabaseUrl;
+      if (s.sync.anonKey !== g.supabaseKey && g.supabaseKey) s.sync.anonKey = g.supabaseKey;
+      // autoSync mặc định = true (luôn bật khi có config nhúng)
+      if (s.sync.autoSync !== true && s.sync.autoSync !== false) s.sync.autoSync = true;
+      // Nếu user đã từng set false thì giữ — nhưng nếu chưa từng set thì true
+      if (typeof s.sync.autoSync !== 'boolean') s.sync.autoSync = true;
+      Storage.saveSettings(s);
+      log('config applied: url=' + s.sync.url + ' autoSync=' + s.sync.autoSync);
+    } catch (e) { console.warn('[Sync] applyDefaultConfig fail', e); }
   }
 
   async function manualSync() {

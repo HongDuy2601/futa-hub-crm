@@ -326,9 +326,10 @@ const App = (function () {
 
   /* ----------- BOOT ----------- */
   function boot() {
-    // Tải cấu hình & seed trước (Login cần đọc danh sách user)
-    if (typeof Sync !== 'undefined') Sync.applyDefaultConfig();
+    // Seed trước (cần thiết để có sales list cho Login)
     Storage.initSeedIfNeeded();
+    // Apply config SAU initSeed (để settings.sync được set đúng)
+    if (typeof Sync !== 'undefined') Sync.applyDefaultConfig();
 
     // Check login — nếu chưa thì hiện màn hình đăng nhập
     if (typeof Login !== 'undefined' && !Login.isLoggedIn()) {
