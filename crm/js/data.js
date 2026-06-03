@@ -72,13 +72,82 @@ const ACTIVITY_TYPES = {
   stage:   { icon: '🔄', label: 'Đổi trạng thái' }
 };
 
-/* ----------- SEED: SALES STAFF ----------- */
+/* ============================================================
+ * SEED: ORGANIZATIONS (CĐT + các sàn) + ROLES + TEAMS + ASSIGNMENTS
+ * ============================================================ */
+const SEED_ORGS = [
+  { id: 'ORG-FUTA',      name: 'FUTA Land',                     type: 'developer',    parentId: null,        contact: '1900 6067' },
+  { id: 'ORG-FUTA-SALE', name: 'Sàn FUTA Sale (nội bộ)',         type: 'inhouse',      parentId: 'ORG-FUTA',  contact: 'sale@futaland.vn' },
+  { id: 'ORG-DIST-A',    name: 'ABC Land (Phân phối F1)',         type: 'distributor',  parentId: null,        contact: 'sales@abcland.vn' },
+  { id: 'ORG-DIST-B',    name: 'Đại Phát Realty (Phân phối F1)',  type: 'distributor',  parentId: null,        contact: 'info@daiphat.vn' },
+  { id: 'ORG-DIST-C',    name: 'Tân Hoàng Realty (Phân phối F2)', type: 'distributor',  parentId: null,        contact: 'cs@tanhoang.vn' }
+];
+
+const ORG_TYPES = {
+  developer:    { label: 'Chủ đầu tư', icon: '🏛', color: '#1B5E20' },
+  inhouse:      { label: 'Sàn nội bộ CĐT', icon: '🏢', color: '#1B5E20' },
+  distributor:  { label: 'Sàn phân phối', icon: '🤝', color: '#2563eb' }
+};
+
+// 6 vai trò, level cao = quyền lớn hơn
+const ROLES = [
+  { id: 'admin',    name: 'Admin CĐT',            level: 100, scope: 'all',          icon: '👑', color: '#C8102E', desc: 'Toàn quyền, xem-sửa tất cả' },
+  { id: 'cdt_pm',   name: 'QL Dự án CĐT',         level: 80,  scope: 'project',      icon: '🏛', color: '#9333ea', desc: 'Xem mọi sàn ở dự án được giao, duyệt quỹ căn' },
+  { id: 'gd_san',   name: 'Giám đốc sàn',         level: 70,  scope: 'org',          icon: '👔', color: '#1B5E20', desc: 'Quản lý toàn bộ sàn của mình' },
+  { id: 'gdkd',     name: 'GĐ Kinh doanh / Trưởng nhóm', level: 50, scope: 'team',   icon: '🧑‍💼', color: '#2563eb', desc: 'Quản lý 1-2 team trong sàn' },
+  { id: 'tvv',      name: 'Tư vấn viên',          level: 30,  scope: 'self',         icon: '👤', color: '#6b7280', desc: 'Chỉ thấy KH/deal của mình' },
+  { id: 'readonly', name: 'Chỉ xem (lãnh đạo/kế toán)', level: 10, scope: 'all_readonly', icon: '👁', color: '#9ca3af', desc: 'Xem toàn bộ, không sửa' }
+];
+
+const SEED_TEAMS = [
+  // Sàn nội bộ FUTA
+  { id: 'TEAM-FUTA-01', orgId: 'ORG-FUTA-SALE', name: 'KD-01 (Quận 2)',         leaderSalesId: null },
+  { id: 'TEAM-FUTA-02', orgId: 'ORG-FUTA-SALE', name: 'KD-02 (Bình Thạnh)',     leaderSalesId: null },
+  { id: 'TEAM-FUTA-03', orgId: 'ORG-FUTA-SALE', name: 'KD-03 (Q.7)',            leaderSalesId: null },
+  // Sàn ABC Land
+  { id: 'TEAM-A-01',    orgId: 'ORG-DIST-A',    name: 'ABC Team Bắc',           leaderSalesId: null },
+  { id: 'TEAM-A-02',    orgId: 'ORG-DIST-A',    name: 'ABC Team Nam',           leaderSalesId: null },
+  // Sàn Đại Phát
+  { id: 'TEAM-B-01',    orgId: 'ORG-DIST-B',    name: 'Đại Phát Team 1',        leaderSalesId: null },
+  // Sàn Tân Hoàng
+  { id: 'TEAM-C-01',    orgId: 'ORG-DIST-C',    name: 'Tân Hoàng Team Chính',   leaderSalesId: null }
+];
+
+// Mỗi sàn được CĐT giao bán dự án nào (project assignments)
+// FUTA-SALE bán tất cả. Sàn ngoài chỉ bán dự án được giao.
+const SEED_PROJECT_ASSIGNMENTS = [
+  { orgId: 'ORG-FUTA-SALE', projectId: 'futa-sky-garden' },
+  { orgId: 'ORG-FUTA-SALE', projectId: 'futa-riverside' },
+  { orgId: 'ORG-DIST-A',    projectId: 'futa-sky-garden' },   // ABC Land chỉ bán Sky Garden
+  { orgId: 'ORG-DIST-B',    projectId: 'futa-sky-garden' },   // Đại Phát bán Sky Garden
+  { orgId: 'ORG-DIST-B',    projectId: 'futa-riverside' },    // và Riverside
+  { orgId: 'ORG-DIST-C',    projectId: 'futa-riverside' }     // Tân Hoàng chỉ bán Riverside
+];
+
+/* ----------- SEED: SALES STAFF (mở rộng có orgId/teamId/roleId) ----------- */
 const SEED_SALES = [
-  { id: 'S001', name: 'Phạm Hồng Duy',    code: 'PHD', team: 'KD-01', email: 'duy.phamhong@futaland.vn', phone: '0908 123 456' },
-  { id: 'S002', name: 'Nguyễn Minh Anh',  code: 'NMA', team: 'KD-01', email: 'anh.nguyen@futaland.vn',    phone: '0909 234 567' },
-  { id: 'S003', name: 'Trần Quốc Bảo',    code: 'TQB', team: 'KD-02', email: 'bao.tran@futaland.vn',     phone: '0907 345 678' },
-  { id: 'S004', name: 'Lê Thị Cẩm Tú',    code: 'LCT', team: 'KD-02', email: 'tu.le@futaland.vn',        phone: '0906 456 789' },
-  { id: 'S005', name: 'Võ Hoàng Sơn',     code: 'VHS', team: 'KD-03', email: 'son.vo@futaland.vn',       phone: '0905 567 890' }
+  // Admin CĐT
+  { id: 'S000', name: 'Trần Đại Nhân',     code: 'TDN', orgId: 'ORG-FUTA',      teamId: null,            roleId: 'admin',    email: 'admin@futaland.vn',       phone: '0900 000 001', team: 'CĐT' },
+  // QL Dự án CĐT
+  { id: 'S010', name: 'Nguyễn Thị Lan',    code: 'NTL', orgId: 'ORG-FUTA',      teamId: null,            roleId: 'cdt_pm',   email: 'lan.nguyen@futaland.vn',  phone: '0900 000 002', team: 'CĐT' },
+  // Sàn FUTA nội bộ
+  { id: 'S001', name: 'Phạm Hồng Duy',     code: 'PHD', orgId: 'ORG-FUTA-SALE', teamId: 'TEAM-FUTA-01',  roleId: 'gd_san',   email: 'duy.phamhong@futaland.vn',phone: '0908 123 456', team: 'KD-01' },
+  { id: 'S002', name: 'Nguyễn Minh Anh',   code: 'NMA', orgId: 'ORG-FUTA-SALE', teamId: 'TEAM-FUTA-01',  roleId: 'gdkd',     email: 'anh.nguyen@futaland.vn',  phone: '0909 234 567', team: 'KD-01' },
+  { id: 'S003', name: 'Trần Quốc Bảo',     code: 'TQB', orgId: 'ORG-FUTA-SALE', teamId: 'TEAM-FUTA-02',  roleId: 'gdkd',     email: 'bao.tran@futaland.vn',    phone: '0907 345 678', team: 'KD-02' },
+  { id: 'S004', name: 'Lê Thị Cẩm Tú',     code: 'LCT', orgId: 'ORG-FUTA-SALE', teamId: 'TEAM-FUTA-02',  roleId: 'tvv',      email: 'tu.le@futaland.vn',       phone: '0906 456 789', team: 'KD-02' },
+  { id: 'S005', name: 'Võ Hoàng Sơn',      code: 'VHS', orgId: 'ORG-FUTA-SALE', teamId: 'TEAM-FUTA-03',  roleId: 'tvv',      email: 'son.vo@futaland.vn',      phone: '0905 567 890', team: 'KD-03' },
+  // Sàn ABC Land
+  { id: 'S100', name: 'Đặng Văn Khoa',     code: 'DVK', orgId: 'ORG-DIST-A',    teamId: 'TEAM-A-01',     roleId: 'gd_san',   email: 'khoa@abcland.vn',         phone: '0911 100 001', team: 'ABC-Bắc' },
+  { id: 'S101', name: 'Hoàng Bích Trâm',   code: 'HBT', orgId: 'ORG-DIST-A',    teamId: 'TEAM-A-01',     roleId: 'tvv',      email: 'tram@abcland.vn',         phone: '0911 100 002', team: 'ABC-Bắc' },
+  { id: 'S102', name: 'Vũ Trọng Tín',      code: 'VTT', orgId: 'ORG-DIST-A',    teamId: 'TEAM-A-02',     roleId: 'gdkd',     email: 'tin@abcland.vn',          phone: '0911 100 003', team: 'ABC-Nam' },
+  // Sàn Đại Phát
+  { id: 'S200', name: 'Bùi Quang Vinh',    code: 'BQV', orgId: 'ORG-DIST-B',    teamId: 'TEAM-B-01',     roleId: 'gd_san',   email: 'vinh@daiphat.vn',         phone: '0912 200 001', team: 'ĐP-1' },
+  { id: 'S201', name: 'Ngô Thị Phương',    code: 'NTP', orgId: 'ORG-DIST-B',    teamId: 'TEAM-B-01',     roleId: 'tvv',      email: 'phuong@daiphat.vn',       phone: '0912 200 002', team: 'ĐP-1' },
+  // Sàn Tân Hoàng
+  { id: 'S300', name: 'Đỗ Hữu Phước',      code: 'DHP', orgId: 'ORG-DIST-C',    teamId: 'TEAM-C-01',     roleId: 'gd_san',   email: 'phuoc@tanhoang.vn',       phone: '0913 300 001', team: 'TH-Chính' },
+  { id: 'S301', name: 'Lý Hoàng My',       code: 'LHM', orgId: 'ORG-DIST-C',    teamId: 'TEAM-C-01',     roleId: 'tvv',      email: 'my@tanhoang.vn',          phone: '0913 300 002', team: 'TH-Chính' },
+  // Kế toán xem
+  { id: 'S900', name: 'Trịnh Minh Tâm',    code: 'TMT', orgId: 'ORG-FUTA',      teamId: null,            roleId: 'readonly', email: 'ketoan@futaland.vn',      phone: '0900 900 001', team: 'Kế toán' }
 ];
 
 /* ----------- SEED: LEADS ----------- */
@@ -118,7 +187,9 @@ function generateSeedLeads(count = 42) {
     const phone = randomPhone(s);
     const status = pickFrom(statuses, s + 3);
     const source = pickFrom(sources, s + 4);
-    const salesId = SEED_SALES[Math.floor(seedRandom(s + 5) * SEED_SALES.length)].id;
+    // Chỉ gán cho TVV/GDKD (không admin/readonly/CĐT PM)
+    const assignableSales = SEED_SALES.filter(x => ['tvv', 'gdkd', 'gd_san'].includes(x.roleId));
+    const salesId = assignableSales[Math.floor(seedRandom(s + 5) * assignableSales.length)].id;
     const project = projects[Math.floor(seedRandom(s + 6) * projects.length)] || null;
     const rating = Math.min(5, Math.max(1, Math.round(seedRandom(s + 7) * 5)));
     const budget = Math.round(2000 + seedRandom(s + 8) * 18000); // tỷ VND
@@ -466,17 +537,28 @@ function generateSeedTargets() {
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
-
-  return SEED_SALES.map((s, i) => ({
-    id: 'TG' + (1000 + i),
-    salesId: s.id,
-    period: 'month',
-    month: month,
-    year: year,
-    revenueTarget: [15000, 12000, 10000, 18000, 8000][i], // triệu VND
-    dealTarget: [5, 4, 3, 6, 2][i],
-    leadTarget: [20, 18, 15, 25, 10][i]
-  }));
+  // Chỉ sinh target cho role làm sale (tvv/gdkd/gd_san), bỏ admin/readonly/cdt_pm
+  const targetable = SEED_SALES.filter(s => ['tvv', 'gdkd', 'gd_san'].includes(s.roleId));
+  // Mỗi role có mức target khác nhau
+  const baseByRole = {
+    gd_san: { rev: 25000, deal: 8,  lead: 30 },
+    gdkd:   { rev: 15000, deal: 5,  lead: 22 },
+    tvv:    { rev: 8000,  deal: 3,  lead: 15 }
+  };
+  return targetable.map((s, i) => {
+    const base = baseByRole[s.roleId] || baseByRole.tvv;
+    const variance = 0.85 + (Math.sin(i * 9) + 1) * 0.15; // 0.85..1.15
+    return {
+      id: 'TG' + (1000 + i),
+      salesId: s.id,
+      period: 'month',
+      month: month,
+      year: year,
+      revenueTarget: Math.round(base.rev * variance),
+      dealTarget: Math.round(base.deal * variance),
+      leadTarget: Math.round(base.lead * variance)
+    };
+  });
 }
 
 /* ----------- SEED CUSTOMER EXTENDED (Customer 360) ----------- */

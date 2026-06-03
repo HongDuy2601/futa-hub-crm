@@ -15,7 +15,10 @@ const Storage = (function () {
     notifs:   'futa_crm_notifications',
     targets:  'futa_crm_targets',
     settings: 'futa_crm_settings',
-    views:    'futa_crm_saved_views'
+    views:    'futa_crm_saved_views',
+    orgs:     'futa_crm_organizations',
+    teams:    'futa_crm_teams',
+    assigns:  'futa_crm_project_assignments'
   };
 
   function read(key, fallback) {
@@ -58,10 +61,14 @@ const Storage = (function () {
     write(KEYS.leads, leads);
     write(KEYS.deals, deals);
     write(KEYS.sales, SEED_SALES);
+    write(KEYS.orgs, SEED_ORGS);
+    write(KEYS.teams, SEED_TEAMS);
+    write(KEYS.assigns, SEED_PROJECT_ASSIGNMENTS);
     write(KEYS.tasks, tasks);
     write(KEYS.notifs, notifs);
     write(KEYS.targets, targets);
-    write(KEYS.me, SEED_SALES[0]);
+    // Mặc định login bằng admin để demo
+    write(KEYS.me, SEED_SALES.find(s => s.roleId === 'admin') || SEED_SALES[0]);
     const existingSettings = read(KEYS.settings, {});
     write(KEYS.settings, Object.assign({
       companyName: 'FUTA Land',
@@ -255,6 +262,57 @@ const Storage = (function () {
     write(KEYS.views, getSavedViews().filter(v => v.id !== id));
   }
 
+  /* ----------- ORGS / TEAMS / PROJECT-ASSIGNMENTS ----------- */
+  function getOrgs() { return read(KEYS.orgs, []); }
+  function getOrg(id) { return getOrgs().find(o => o.id === id); }
+  function saveOrg(o) {
+    const list = getOrgs();
+    const i = list.findIndex(x => x.id === o.id);
+    if (i >= 0) list[i] = o; else { o.id = o.id || uid('ORG'); list.push(o); }
+    write(KEYS.orgs, list);
+    return o;
+  }
+  function deleteOrg(id) { write(KEYS.orgs, getOrgs().filter(o => o.id !== id)); }
+
+  function getTeamsAll() { return read(KEYS.teams, []); }
+  function getTeam(id) { return getTeamsAll().find(t => t.id === id); }
+  function getTeamsByOrg(orgId) { return getTeamsAll().filter(t => t.orgId === orgId); }
+  function saveTeam(t) {
+    const list = getTeamsAll();
+    const i = list.findIndex(x => x.id === t.id);
+    if (i >= 0) list[i] = t; else { t.id = t.id || uid('TEAM'); list.push(t); }
+    write(KEYS.teams, list);
+    return t;
+  }
+  function deleteTeam(id) { write(KEYS.teams, getTeamsAll().filter(t => t.id !== id)); }
+
+  function getProjectAssignments() { return read(KEYS.assigns, []); }
+  function getProjectsForOrg(orgId) {
+    return getProjectAssignments().filter(a => a.orgId === orgId).map(a => a.projectId);
+  }
+  function saveAssignment(orgId, projectId) {
+    const list = getProjectAssignments();
+    if (!list.find(a => a.orgId === orgId && a.projectId === projectId)) {
+      list.push({ orgId, projectId });
+      write(KEYS.assigns, list);
+    }
+  }
+  function deleteAssignment(orgId, projectId) {
+    write(KEYS.assigns, getProjectAssignments().filter(a => !(a.orgId === orgId && a.projectId === projectId)));
+  }
+
+  /* ----------- SALES CRUD (mở rộng) ----------- */
+  function saveSale(s) {
+    const list = read(KEYS.sales, []);
+    const i = list.findIndex(x => x.id === s.id);
+    if (i >= 0) list[i] = s; else { s.id = s.id || uid('S'); list.push(s); }
+    write(KEYS.sales, list);
+    return s;
+  }
+  function deleteSale(id) {
+    write(KEYS.sales, read(KEYS.sales, []).filter(s => s.id !== id));
+  }
+
   /* ----------- BULK helpers ----------- */
   function bulkUpdateLeads(ids, patch) {
     const list = getLeads();
@@ -285,6 +343,10 @@ const Storage = (function () {
     getSettings, saveSettings,
     getSavedViews, saveView, deleteView,
     bulkUpdateLeads, bulkDeleteLeads,
+    getOrgs, getOrg, saveOrg, deleteOrg,
+    getTeamsAll, getTeam, getTeamsByOrg, saveTeam, deleteTeam,
+    getProjectAssignments, getProjectsForOrg, saveAssignment, deleteAssignment,
+    saveSale, deleteSale,
     read, write
   };
 })();

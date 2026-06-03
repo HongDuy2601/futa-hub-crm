@@ -1095,6 +1095,84 @@ table.data-table tr:last-child td { border-bottom: none; }
 .kpi-card { position: relative; }
 
 /* ============================================================
+ * USER PICKER (switch role demo) + ROLE BADGE
+ * ============================================================ */
+.user-pick {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .65rem .85rem;
+  border: 2px solid var(--gray-200);
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  transition: all .12s;
+  background: white;
+}
+.user-pick:hover { border-color: var(--futa-green); transform: translateY(-1px); box-shadow: var(--shadow); }
+.user-pick.active { border-color: var(--futa-green); background: var(--futa-green-light); }
+.up-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .85rem;
+  flex-shrink: 0;
+}
+.up-info { flex: 1; min-width: 0; }
+.up-info strong { font-size: .9rem; display: block; }
+.up-role { font-size: .75rem; font-weight: 600; margin-top: 1px; }
+.up-team { font-size: .7rem; color: var(--gray-500); margin-top: 1px; }
+.up-me {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--futa-green);
+  color: white;
+  font-size: .6rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: .5px;
+}
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+/* Org tree (admin page) */
+.org-tree { font-size: .9rem; }
+.org-node {
+  padding: .6rem .85rem;
+  border-radius: 8px;
+  background: var(--gray-50);
+  margin-bottom: .5rem;
+  border-left: 3px solid var(--futa-green);
+}
+.org-node.distributor { border-left-color: var(--blue); }
+.org-node-head { display:flex; align-items:center; gap:.5rem; font-weight: 600; }
+.org-children { margin-left: 1.25rem; margin-top: .5rem; padding-left: .5rem; border-left: 2px dashed var(--gray-300); }
+
+/* Role matrix */
+.role-matrix {
+  display: grid;
+  grid-template-columns: 1fr repeat(6, minmax(60px, 1fr));
+  gap: 1px;
+  background: var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: .82rem;
+}
+.role-matrix > div { background: white; padding: .5rem .65rem; }
+.role-matrix > .matrix-head { background: var(--gray-100); font-weight: 700; text-align: center; }
+.role-matrix > .matrix-row-head { font-weight: 600; }
+.role-matrix .ok { color: var(--futa-green); font-weight: 700; }
+.role-matrix .no { color: var(--gray-300); }
+
+/* ============================================================
  * HEATMAP (executive BI)
  * ============================================================ */
 .heatmap-wrap { overflow-x: auto; }

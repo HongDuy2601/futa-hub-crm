@@ -15,6 +15,7 @@ const App = (function () {
     'reports':       () => Reports.render(),
     'executive':     () => Executive.render(),
     'notifications': () => Notifications.render(),
+    'admin':         () => Admin.render(),
     'settings':      () => Settings.render()
   };
 
@@ -37,6 +38,18 @@ const App = (function () {
 
   function render() {
     const { route, params } = parseHash();
+    // Guard: chặn truy cập trang vượt quyền
+    if (typeof Perm !== 'undefined' && !Perm.canViewPage(route)) {
+      document.getElementById('pageContent').innerHTML =
+        `<div class="empty">
+           <div class="empty-icon">🔒</div>
+           <h3>Không có quyền truy cập</h3>
+           <p>Vai trò hiện tại (${Perm.role().name}) không được phép xem trang này.</p>
+           <button class="btn btn-primary" style="margin-top:1rem" onclick="App.navigate('dashboard')">← Về Dashboard</button>
+         </div>`;
+      updateBadges();
+      return;
+    }
     const handler = routes[route] || routes.dashboard;
     setActiveNav(route);
     try {
@@ -66,20 +79,90 @@ const App = (function () {
 
   function renderUser() {
     const u = Storage.getCurrentUser();
-    document.getElementById('userAvatar').textContent = initials(u.name);
+    const role = (typeof ROLES !== 'undefined') ? ROLES.find(r => r.id === u.roleId) : null;
+    const org = (typeof Storage.getOrg === 'function') ? Storage.getOrg(u.orgId) : null;
+    const avatar = document.getElementById('userAvatar');
+    avatar.textContent = initials(u.name);
+    if (role) avatar.style.background = role.color;
     document.getElementById('userName').textContent = u.name;
-    document.getElementById('userRole').textContent = u.team + ' · ' + u.code;
+    const subRole = role ? role.name : (u.team || u.code);
+    const subOrg = org ? ' · ' + (org.name.length > 22 ? org.name.slice(0, 20) + '…' : org.name) : '';
+    document.getElementById('userRole').textContent = subRole + subOrg;
+    applyRoleNavVisibility();
   }
 
-  /* ----------- USER SWITCHER (demo) ----------- */
+  // Ẩn / hiện nav theo role
+  function applyRoleNavVisibility() {
+    if (typeof Perm === 'undefined') return;
+    document.querySelectorAll('.nav-item[data-route]').forEach(el => {
+      const r = el.dataset.route;
+      el.style.display = Perm.canViewPage(r) ? '' : 'none';
+    });
+  }
+
+  /* ----------- USER SWITCHER (modal chọn) ----------- */
   function switchUser() {
-    const sales = Storage.getSales();
+    const sales = (Storage._raw && Storage._raw.getSales ? Storage._raw.getSales() : Storage.getSales)();
+    const orgs = Storage.getOrgs ? Storage.getOrgs() : [];
     const me = Storage.getCurrentUser();
-    const idx = sales.findIndex(s => s.id === me.id);
-    const next = sales[(idx + 1) % sales.length];
-    Storage.setCurrentUser(next);
+
+    // Group sales theo org
+    const groups = {};
+    sales.forEach(s => {
+      const oId = s.orgId || 'no-org';
+      if (!groups[oId]) groups[oId] = [];
+      groups[oId].push(s);
+    });
+
+    const body = `
+      <p style="color:var(--gray-500);font-size:.85rem;margin-bottom:1rem">
+        Chọn tài khoản để đăng nhập với tư cách đó (demo phân quyền).
+      </p>
+      ${Object.entries(groups).map(([oId, list]) => {
+        const o = orgs.find(x => x.id === oId);
+        const orgLabel = o ? `${(ORG_TYPES[o.type] || {}).icon || ''} ${o.name}` : '— Khác —';
+        return `
+          <div style="margin-bottom:1.25rem">
+            <h4 style="color:var(--futa-green-dark);font-size:.85rem;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:1px">${orgLabel}</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.5rem">
+              ${list.map(s => {
+                const r = (typeof ROLES !== 'undefined') ? ROLES.find(x => x.id === s.roleId) : null;
+                const isMe = s.id === me.id;
+                return `
+                  <div class="user-pick ${isMe ? 'active' : ''}" onclick="App.pickUser('${s.id}')">
+                    <div class="up-avatar" style="background:${r ? r.color : '#1B5E20'}">${initials(s.name)}</div>
+                    <div class="up-info">
+                      <strong>${s.name}</strong>
+                      <div class="up-role" style="color:${r ? r.color : ''}">${r ? r.icon + ' ' + r.name : s.team}</div>
+                      <div class="up-team">${s.team || ''} · ${s.code}</div>
+                    </div>
+                    ${isMe ? '<span class="up-me">ĐANG DÙNG</span>' : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    `;
+    Modal.show({
+      title: '🔄 Chuyển tài khoản (demo)',
+      body,
+      footer: `<button class="btn btn-secondary" onclick="Modal.hide()">Đóng</button>`,
+      size: 'lg'
+    });
+  }
+
+  function pickUser(id) {
+    const sales = (Storage._raw && Storage._raw.getSales ? Storage._raw.getSales() : Storage.getSales)();
+    const u = sales.find(s => s.id === id);
+    if (!u) return;
+    Storage.setCurrentUser(u);
+    Modal.hide();
     renderUser();
-    toast('Đã chuyển sang ' + next.name, 'success');
+    toast('Đã chuyển sang: ' + u.name + ' (' + (ROLES.find(r => r.id === u.roleId) || {}).name + ')', 'success');
+    // Re-render trang hiện tại với scope mới
+    render();
   }
 
   /* ----------- TOAST ----------- */
@@ -193,11 +276,31 @@ const App = (function () {
   }
 
   function afterData() {
+    installScopedStorage();
     renderUser();
     if (typeof Sync !== 'undefined') { Sync.enableAutoSync(); Sync.startPolling(); }
     if (!location.hash) location.hash = '#/dashboard';
     render();
     Storage.subscribe(updateBadges);
+  }
+
+  /* ----------- Wrap Storage để filter theo phân quyền ----------- */
+  function installScopedStorage() {
+    if (typeof Perm === 'undefined' || Storage._raw) return;
+    Storage._raw = {
+      getLeads:         Storage.getLeads,
+      getDeals:         Storage.getDeals,
+      getTasks:         Storage.getTasks,
+      getEnrichedUnits: Storage.getEnrichedUnits,
+      getTargets:       Storage.getTargets,
+      getSales:         Storage.getSales
+    };
+    Storage.getLeads         = function() { return Perm.filterLeads(Storage._raw.getLeads()); };
+    Storage.getDeals         = function() { return Perm.filterDeals(Storage._raw.getDeals()); };
+    Storage.getTasks         = function() { return Perm.filterTasks(Storage._raw.getTasks()); };
+    Storage.getEnrichedUnits = function() { return Perm.filterUnits(Storage._raw.getEnrichedUnits()); };
+    Storage.getTargets       = function() { return Perm.filterTargets(Storage._raw.getTargets()); };
+    Storage.getSales         = function() { return Perm.filterSales(Storage._raw.getSales()); };
   }
 
   /* ----------- BOOT ----------- */
@@ -225,7 +328,7 @@ const App = (function () {
     }
   }
 
-  return { boot, navigate, render, toast, Modal };
+  return { boot, navigate, render, toast, Modal, pickUser };
 })();
 
 document.addEventListener('DOMContentLoaded', App.boot);
